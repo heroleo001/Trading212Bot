@@ -1,0 +1,70 @@
+{
+  "GET_ALL_ORDERS": {
+    "path": "/equity/orders",
+    "method": "GET"
+  },
+  "PLACE_MARKET_ORDER": {
+    "path": "/equity/orders/market",
+    "method": "POST"
+  },
+  "PLACE_LIMIT_ORDER": {
+    "path": "/equity/orders/limit",
+    "method": "POST"
+  },
+  "PLACE_STOP_ORDER": {
+    "path": "/equity/orders/stop",
+    "method": "POST"
+  },
+  "PLACE_STOP_LIMIT_ORDER": {
+    "path": "/equity/orders/stop_limit",
+    "method": "POST"
+  },
+  "GET_ORDER_BY_ID": {
+    "path": "/equity/orders/",
+    "method": "GET"
+  },
+  "CANCEL_ORDER_BY_ID": {
+    "path": "/equity/orders/",
+    "method": "DELETE"
+  },
+  "GET_POSITIONS": {
+    "path": "/equity/positions",
+    "method": "GET"
+  },
+  "GET_ACCOUNT_CASH": {
+    "path": "/equity/account/cash",
+    "method": "GET"
+  },
+  "GET_ACCOUNT_SUMMARY": {
+    "path": "/equity/account/summary",
+    "method": "GET"
+  },
+  "GET_INSTRUMENTS": {
+    "path": "/equity/metadata/instruments",
+    "method": "GET"
+  },
+  "GET_EXCHANGES": {
+    "path": "/equity/metadata/exchanges",
+    "method": "GET"
+  },
+  "GET_HISTORY_DIVIDENDS": {
+    "path": "/equity/history/dividends",
+    "method": "GET"
+  },
+  "GET_HISTORY_EXPORTS": {
+    "path": "/equity/history/exports",
+    "method": "GET"
+  },
+  "POST_HISTORY_EXPORTS": {
+    "path": "/equity/history/exports",
+    "method": "POST"
+  },
+  "GET_HISTORY_ORDERS": {
+    "path": "/equity/history/orders",
+    "method": "GET"
+  },
+  "GET_HISTORY_TRANSACTIONS": {
+    "path": "/equity/history/transactions",
+    "method": "GET"
+  }
+}
