@@ -1,5 +1,8 @@
 package sk.leo.api;
 
+import sk.leo.api.records.ApiModels;
+import sk.leo.api.records.ResolvedEndpoint;
+
 import java.util.HashMap;
 import java.util.Map;
 

@@ -4,6 +4,8 @@ public enum EndpointKey {
 
     GET_ACCOUNT_SUMMARY("getAccountSummary"),
 
+    GET_OPEN_POSITIONS("getPositions"),
+
     PLACE_MARKET_ORDER("placeMarketOrder"),
     PLACE_LIMIT_ORDER("placeLimitOrder"),
     PLACE_STOP_ORDER("placeStopOrder_1"),

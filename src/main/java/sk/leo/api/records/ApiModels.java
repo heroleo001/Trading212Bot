@@ -1,4 +1,4 @@
-package sk.leo.api;
+package sk.leo.api.records;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 

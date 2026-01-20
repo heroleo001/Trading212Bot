@@ -1,4 +1,4 @@
-package sk.leo.api;
+package sk.leo.api.records;
 
 public class Requests {
     // ----------------------------
