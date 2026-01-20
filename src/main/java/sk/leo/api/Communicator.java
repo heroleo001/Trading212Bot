@@ -2,7 +2,9 @@ package sk.leo.api;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import sk.leo.api.records.AccountSummary;
 import sk.leo.api.records.Position;
+import sk.leo.api.records.Requests.*;
 import sk.leo.api.records.ResolvedEndpoint;
 
 import java.net.URI;
@@ -66,7 +68,7 @@ public final class Communicator {
         );
     }
 
-    public static Map<String, Position> fetchPositions() throws Exception {
+    public static Map<String, Position> getPositions() throws Exception {
 
         HttpResponse<String> response = call(
                 EndpointKey.GET_OPEN_POSITIONS,
@@ -88,5 +90,40 @@ public final class Communicator {
                         Position::ticker,
                         p -> p
                 ));
+    }
+
+    public static AccountSummary getAccountSummary() throws Exception{
+        HttpResponse<String> response = call(EndpointKey.GET_ACCOUNT_SUMMARY, null, null);
+        if (response.statusCode() != 200) {
+            throw new IllegalStateException("Failed to fetch positions: " + response.body());
+        }
+        System.out.println(response.body());
+        System.out.println(MAPPER.readValue(response.body(), AccountSummary.class));
+        return MAPPER.readValue(response.body(), AccountSummary.class);
+    }
+
+    
+    public static double getFreeCash() throws Exception{
+        return getAccountSummary().cash().availableToTrade();
+    }
+
+    
+    public static double getTotalValue() throws Exception {
+        return getAccountSummary().totalValue();
+    }
+
+    
+    public static double getMarketPrice(String ticker) throws Exception {
+        return 0;
+    }
+
+    
+    public static HttpResponse<String> buyMarket(String ticker, double quantity) throws Exception {
+        return call(EndpointKey.PLACE_MARKET_ORDER, null, new MarketRequest(ticker, quantity, false));
+    }
+
+    
+    public static HttpResponse<String> sellMarket(String ticker, double quantity) throws Exception {
+        return buyMarket(ticker, -quantity);
     }
 }
