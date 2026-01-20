@@ -1,15 +1,13 @@
-package sk.leo;
+package sk.leo.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.jetbrains.annotations.NotNull;
+import sk.leo.Endpoints;
 
 import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.Objects;
@@ -18,15 +16,14 @@ public class Communicator {
 
     private static final String BASE_URL =
             "https://demo.trading212.com/api/v0";
+    private final String header;
 
     private final HttpClient client = HttpClient.newHttpClient();
     private final Map<Endpoints, EndpointConfig> endpoints;
 
-    private final String authHeader;
-
-    public Communicator(String apiKey, String apiSecret) {
-        this.authHeader = buildAuth(apiKey, apiSecret);
+    public Communicator() {
         this.endpoints = loadEndpoints();
+        header = Auth.header();
     }
 
     public HttpResponse<String> send(
@@ -38,7 +35,7 @@ public class Communicator {
 
         HttpRequest.Builder builder = HttpRequest.newBuilder()
                 .uri(URI.create(BASE_URL + cfg.path() + pathExtension))
-                .header("Authorization", authHeader);
+                .header("Authorization", header);
 
         //TODO add not all methods have bodies
         builder.header("Content-Type", "application/json");
@@ -66,10 +63,7 @@ public class Communicator {
 
     // ===== helpers =====
 
-    private static String buildAuth(String key, String secret) {
-        String credentials = key + ":" + secret;
-        return "Basic " + Base64.getEncoder().encodeToString(credentials.getBytes(StandardCharsets.UTF_8));
-    }
+
 
     private Map<Endpoints, EndpointConfig> loadEndpoints() {
         try (InputStream is = getClass()

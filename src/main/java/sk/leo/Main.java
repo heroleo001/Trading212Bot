@@ -3,22 +3,22 @@ package sk.leo;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import sk.leo.api.Communicator;
 
 import java.net.http.HttpResponse;
 
 public class Main {
 
-    private static final String API_KEY = System.getenv("T212_API_KEY");
-    private static final String API_SECRET = System.getenv("T212_API_SECRET");
+
 
     private static final String BASE_URL =
             "https://demo.trading212.com/api/v0";
 
     public static void main(String[] args) {
-        Communicator com = new Communicator(API_KEY, API_SECRET);
+        Communicator com = new Communicator();
 
         try {
-            HttpResponse<String> response = com.send(Endpoints.CANCEL_ORDER_BY_ID, null, "43200946852");
+            HttpResponse<String> response = com.send(Endpoints.PLACE_MARKET_ORDER, getMarketOrderJson());
             System.out.println(response.body());
 
         } catch (Exception e) {
