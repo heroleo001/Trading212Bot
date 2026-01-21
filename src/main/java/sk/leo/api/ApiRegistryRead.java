@@ -32,7 +32,7 @@ public class ApiRegistryRead {
     }
 
     static {
-        for (EndpointKey key : EndpointKey.values()) {
+        for (ServiceCallType key : ServiceCallType.values()) {
             EndpointResolver.resolve(key);
         }
     }

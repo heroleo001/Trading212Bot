@@ -15,20 +15,25 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-public final class Communicator {
+@Deprecated
+public class Communicator {
 
     private static final String BASE_URL =
             "https://demo.trading212.com";
-    private static final String HEADER = Auth.header();
+    private final String header;
 
     private static final ObjectMapper MAPPER = new ObjectMapper().configure(
             DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES,
             false
     );
-    private static final HttpClient CLIENT = HttpClient.newHttpClient();
+    private final HttpClient CLIENT = HttpClient.newHttpClient();
 
-    public static HttpResponse<String> call(
-            EndpointKey endpoint,
+    public Communicator(String header){
+        this.header = header;
+    }
+
+    public HttpResponse<String> call(
+            ServiceCallType endpoint,
             Map<String, String> pathParams,
             Object body
     ) throws Exception {
@@ -45,7 +50,7 @@ public final class Communicator {
 
         HttpRequest.Builder builder = HttpRequest.newBuilder()
                 .uri(URI.create(BASE_URL + path))
-                .header("Authorization", HEADER)
+                .header("Authorization", header)
                 .header("Content-Type", "application/json");
 
         if (body != null) {
@@ -68,10 +73,10 @@ public final class Communicator {
         );
     }
 
-    public static Map<String, Position> getPositions() throws Exception {
+    public Map<String, Position> getPositions() throws Exception {
 
         HttpResponse<String> response = call(
-                EndpointKey.GET_OPEN_POSITIONS,
+                ServiceCallType.GET_OPEN_POSITIONS,
                 null,
                 null
         );
@@ -92,8 +97,8 @@ public final class Communicator {
                 ));
     }
 
-    public static AccountSummary getAccountSummary() throws Exception{
-        HttpResponse<String> response = call(EndpointKey.GET_ACCOUNT_SUMMARY, null, null);
+    public AccountSummary getAccountSummary() throws Exception{
+        HttpResponse<String> response = call(ServiceCallType.GET_ACCOUNT_SUMMARY, null, null);
         if (response.statusCode() != 200) {
             throw new IllegalStateException("Failed to fetch positions: " + response.body());
         }
@@ -103,27 +108,22 @@ public final class Communicator {
     }
 
     
-    public static double getFreeCash() throws Exception{
+    public double getFreeCash() throws Exception{
         return getAccountSummary().cash().availableToTrade();
     }
 
     
-    public static double getTotalValue() throws Exception {
+    public double getTotalValue() throws Exception {
         return getAccountSummary().totalValue();
     }
 
     
-    public static double getMarketPrice(String ticker) throws Exception {
-        return 0;
+    public HttpResponse<String> buyMarket(String ticker, double quantity) throws Exception {
+        return call(ServiceCallType.PLACE_MARKET_ORDER, null, new MarketRequest(ticker, quantity, false));
     }
 
     
-    public static HttpResponse<String> buyMarket(String ticker, double quantity) throws Exception {
-        return call(EndpointKey.PLACE_MARKET_ORDER, null, new MarketRequest(ticker, quantity, false));
-    }
-
-    
-    public static HttpResponse<String> sellMarket(String ticker, double quantity) throws Exception {
+    public HttpResponse<String> sellMarket(String ticker, double quantity) throws Exception {
         return buyMarket(ticker, -quantity);
     }
 }

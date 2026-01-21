@@ -8,7 +8,7 @@ import java.util.Map;
 
 public class EndpointResolver {
 
-    public static ResolvedEndpoint resolve(EndpointKey key) {
+    public static ResolvedEndpoint resolve(ServiceCallType key) {
 
         for (var pathEntry : ApiRegistryRead.api().paths().entrySet()) {
 
