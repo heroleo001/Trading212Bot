@@ -25,7 +25,7 @@ public class EndpointResolver {
                 String method = entry.getKey();
                 ApiModels.Operation op = entry.getValue();
 
-                if (op != null && key.operationId().equals(op.operationId())) {
+                if (op != null && normalizeOpId(key.operationId()).equals(op.operationId())) {
 
                     String schemaRef = null;
                     if (op.requestBody() != null) {
@@ -50,4 +50,9 @@ public class EndpointResolver {
                 "Operation not found in OpenAPI: " + key.operationId()
         );
     }
+
+    private static String normalizeOpId(String s) {
+        return s == null ? null : s.replaceAll("\\s+", "");
+    }
+
 }
