@@ -1,11 +1,14 @@
 package sk.leo.api.records;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record Position (
-        Instrument instrument,
+        BaseCredentials instrument,
         double quantity,
-        double averagePrice,
-        double currentPrice,
-        double unrealizedPnl
+        Double averagePrice,
+        Double currentPrice,
+        Double unrealizedPnl
 ) {
     public String ticker(){
         return instrument != null ? instrument.ticker() : null;
@@ -16,6 +19,12 @@ public record Position (
     }
 
     public double currentValue(){
-        return quantity * currentPrice;
+        return currentPrice != null ? quantity * currentPrice : 0.0;
     }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record BaseCredentials(
+            String ticker,
+            String name
+    ) {}
 }

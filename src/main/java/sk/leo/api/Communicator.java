@@ -15,6 +15,10 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+
+/**
+ * This class can be used for testing, but permanent usage is unrecommended as it doesn't care about RATE-LIMITS
+ */
 @Deprecated
 public class Communicator {
 
@@ -102,7 +106,6 @@ public class Communicator {
         if (response.statusCode() != 200) {
             throw new IllegalStateException("Failed to fetch positions: " + response.body());
         }
-        System.out.println(response.body());
         System.out.println(MAPPER.readValue(response.body(), AccountSummary.class));
         return MAPPER.readValue(response.body(), AccountSummary.class);
     }

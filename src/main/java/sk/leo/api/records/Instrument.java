@@ -1,6 +1,12 @@
 package sk.leo.api.records;
 
-public record Instrument (
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+public record Instrument(
         String ticker,
-        String name
+        String type, //Stock, ETF or ...
+        String currencyCode,
+        String name,
+        Boolean extendedHours
 ) {}

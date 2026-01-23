@@ -1,32 +1,93 @@
 package sk.leo.api;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import sk.leo.api.querying.DataService;
+import sk.leo.api.records.AccountSummary;
+import sk.leo.api.records.Instrument;
+import sk.leo.api.records.Position;
+
 import java.time.Duration;
-import java.time.temporal.TemporalUnit;
+import java.util.List;
 
 public enum ServiceCallType {
 
-    GET_ACCOUNT_SUMMARY("getAccountSummary", 1, Duration.ofSeconds(5)),
+    GET_ACCOUNT_SUMMARY("getAccountSummary", 1, Duration.ofSeconds(5), true){
+        @Override
+        public ServiceCall<?, ?> createRefreshCall(DataService service) {
+            return new ServiceCall<>(this, null, null,
+                    new TypeReference<AccountSummary>() {}, rs -> service.put(this, rs));
+        }
+    },
 
-    GET_OPEN_POSITIONS("getPositions", 1, Duration.ofSeconds(1)),
-    GET_ALL_AVAILABLE_INSTRUMENTS("instruments", 1, Duration.ofSeconds(50)),
+    GET_OPEN_POSITIONS("getPositions", 1, Duration.ofSeconds(1), true) {
+        @Override
+        public ServiceCall<?, ?> createRefreshCall(DataService service) {
+            return new ServiceCall<>(this, null, null,
+                    new TypeReference<Position[]>() {}, rs -> service.put(this, rs));
+        }
+    },
+    GET_ALL_AVAILABLE_INSTRUMENTS("instruments", 1, Duration.ofSeconds(50), false) {
+        @Override
+        public ServiceCall<?, ?> createRefreshCall(DataService service) {
+            return new ServiceCall<>(this, null, null,
+                    new TypeReference<Instrument[]>() {}, rs -> service.put(this, rs));
+        }
+    },
 
-    PLACE_MARKET_ORDER("placeMarketOrder", 50, Duration.ofSeconds(60)),
-    PLACE_LIMIT_ORDER("placeLimitOrder", 1, Duration.ofSeconds(2)),
-    PLACE_STOP_ORDER("placeStopOrder_1", 1, Duration.ofSeconds(2)),
-    PLACE_STOP_LIMIT_ORDER("placeStopOrder", 1, Duration.ofSeconds(2)),
+    PLACE_MARKET_ORDER("placeMarketOrder", 50, Duration.ofSeconds(60), false) {
+        @Override
+        public ServiceCall<?, ?> createRefreshCall(DataService service) {
+            throw new UnsupportedOperationException("this does not have a response");
+        }
+    },
+    PLACE_LIMIT_ORDER("placeLimitOrder", 1, Duration.ofSeconds(2), false) {
+        @Override
+        public ServiceCall<?, ?> createRefreshCall(DataService service) {
+            throw new UnsupportedOperationException("this does not have a response");
+        }
+    },
+    PLACE_STOP_ORDER("placeStopOrder_1", 1, Duration.ofSeconds(2), false) {
+        @Override
+        public ServiceCall<?, ?> createRefreshCall(DataService service) {
+            throw new UnsupportedOperationException("this does not have a response");
+        }
+    },
+    PLACE_STOP_LIMIT_ORDER("place   StopOrder", 1, Duration.ofSeconds(2), false) {
+        @Override
+        public ServiceCall<?, ?> createRefreshCall(DataService service) {
+            throw new UnsupportedOperationException("this does not have a response");
+        }
+    },
 
-    GET_ORDER_BY_ID("orderById", 1, Duration.ofSeconds(1)),
-    CANCEL_ORDER("cancelOrder", 50, Duration.ofSeconds(60));
+    GET_ORDER_BY_ID("orderById", 1, Duration.ofSeconds(1), false) {
+        @Override
+        public ServiceCall<?, ?> createRefreshCall(DataService service) {
+            throw new UnsupportedOperationException("this should not be refreshed");
+        }
+    },
+    CANCEL_ORDER("cancelOrder", 50, Duration.ofSeconds(60), false) {
+        @Override
+        public ServiceCall<?, ?> createRefreshCall(DataService service) {
+            throw new UnsupportedOperationException("this does not have a response");
+        }
+    };
+
+
+
 
     private final String operationId;
     private final int operationLimit;
     private final Duration timePeriod;
+    private final boolean refreshData;
 
-    ServiceCallType(String operationId, int operationLimit, Duration timePeriod1) {
+    ServiceCallType(String operationId, int operationLimit, Duration timePeriod, boolean refreshData) {
         this.operationId = operationId;
         this.operationLimit = operationLimit;
-        this.timePeriod = timePeriod1;
+        this.timePeriod = timePeriod;
+        this.refreshData = refreshData;
     }
+
+
 
     public String operationId() {
         return operationId;
@@ -39,4 +100,10 @@ public enum ServiceCallType {
     public int getOperationLimit() {
         return operationLimit;
     }
+
+    public boolean isToRefresh() {
+        return refreshData;
+    }
+
+    public abstract ServiceCall<?, ?> createRefreshCall(DataService service);
 }

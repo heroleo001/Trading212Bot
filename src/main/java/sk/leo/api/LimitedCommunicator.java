@@ -1,6 +1,7 @@
 package sk.leo.api;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import sk.leo.api.records.ResolvedEndpoint;
 
@@ -11,16 +12,21 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Instant;
 import java.util.*;
-import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class LimitedCommunicator {
     private static final String BASE_URL =
             "https://demo.trading212.com";
 
-    private final Map<ServiceCallType, Queue<ServiceCall<?, ?>>> queues = new HashMap<>();
-    private final Map<ServiceCallType, List<Instant>> calls = new HashMap<>();
+    private final Map<ServiceCallType, Queue<ServiceCall<?, ?>>> queues = new ConcurrentHashMap<>();
+    private final Map<ServiceCallType, Queue<Instant>> calls = new ConcurrentHashMap<>();
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final ObjectMapper MAPPER = new ObjectMapper().configure(
+            DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES,
+            false
+    );
     private static final HttpClient CLIENT = HttpClient.newHttpClient();
 
     private final String header;
@@ -28,9 +34,10 @@ public class LimitedCommunicator {
     public LimitedCommunicator(String header) {
         this.header = header;
         Arrays.stream(ServiceCallType.values()).forEach(callType -> {
-            calls.put(callType, new ArrayList<>());
-            queues.put(callType, new LinkedList<>());
+            calls.put(callType, new ConcurrentLinkedQueue<>());
+            queues.put(callType, new ConcurrentLinkedQueue<>());
         });
+
         new Timer().scheduleAtFixedRate(
                 new TimerTask() {
                     @Override
@@ -39,22 +46,24 @@ public class LimitedCommunicator {
                     }
                 },
                 0,
-                1000
+                5000
         );
     }
 
     public void callService(ServiceCall<?, ?> call) {
         this.queues.get(call.callType()).add(call);
+        handleQueue();
     }
 
     private boolean canCallNow(ServiceCall<?, ?> call) {
         ServiceCallType type = call.callType();
-        int currentRateLimitCountDuringCurrentPeriod = (int) calls.get(type).stream()
-                .filter(callTimestamp -> Instant.now()
-                        .minus(type.getTimePeriod())
-                        .isAfter(callTimestamp))
-                .count();
-        return currentRateLimitCountDuringCurrentPeriod < type.getOperationLimit();
+        Queue<Instant> q = calls.get(type);
+
+        Instant cutoffTime = Instant.now().minus(type.getTimePeriod()); // Instant after which the calls are within the time period for the Call
+
+        q.removeIf(cutoffTime::isAfter);
+
+        return q.size() < type.getOperationLimit();
     }
 
     private <RS> void handleQueue() {
@@ -65,56 +74,66 @@ public class LimitedCommunicator {
 
             if (canCallNow(call)) {
                 try {
-                    handleCall(queues.get(callType).poll());
+                    handleCallNow(Objects.requireNonNull(queues.get(callType).poll()));
                 } catch (Exception e) {
                     throw new RuntimeException(e);
                 }
             }
-        });
+    });
+}
+
+private <RQ, RS> void handleCallNow(ServiceCall<RQ, RS> call) throws IOException, InterruptedException, Exception {
+    ResolvedEndpoint ep = EndpointResolver.resolve(call.callType());
+    String endpointPath = ep.path();
+
+    ///  Adds path-params if necessary
+    if (call.pathParams() != null) {
+        for (var e : call.pathParams().entrySet()) {
+            endpointPath = endpointPath.replace("{" + e.getKey() + "}", e.getValue());
+        }
     }
 
-    private <RQ, RS> void handleCall(ServiceCall<RQ, RS> call) throws IOException, InterruptedException {
-        ResolvedEndpoint ep = EndpointResolver.resolve(call.callType());
-        String endpointPath = ep.path();
 
-        ///  Adds path-params if necessary
-        if (call.pathParams() != null){
-            for (var e : call.pathParams().entrySet()) {
-                endpointPath = endpointPath.replace("{" + e.getKey() + "}", e.getValue());
-            }
-        }
+    HttpRequest.Builder builder = HttpRequest.newBuilder()
+            .uri(URI.create(BASE_URL + endpointPath))
+            .header("Authorization", header)
+            .header("Content-Type", "application/json");
 
 
-        HttpRequest.Builder builder = HttpRequest.newBuilder()
-                .uri(URI.create(BASE_URL + endpointPath))
-                .header("Authorization", header)
-                .header("Content-Type", "application/json");
-
-
-        if (call.payload() != null) {
-            try {
-                builder.method(
-                        ep.method(),
-                        HttpRequest.BodyPublishers.ofString(
-                                MAPPER.writeValueAsString(call.payload())
-                        )
-                );
-            } catch (JsonProcessingException e) {
-                throw new RuntimeException(e);
-            }
-        } else {
+    if (call.payload() != null) {
+        try {
             builder.method(
                     ep.method(),
-                    HttpRequest.BodyPublishers.noBody()
+                    HttpRequest.BodyPublishers.ofString(
+                            MAPPER.writeValueAsString(call.payload())
+                    )
             );
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
         }
-
-        HttpResponse<String> result = CLIENT.send(
-                builder.build(),
-                HttpResponse.BodyHandlers.ofString()
+    } else {
+        builder.method(
+                ep.method(),
+                HttpRequest.BodyPublishers.noBody()
         );
+    }
 
+    /// Sending Request
+    HttpResponse<String> result = CLIENT.send(
+            builder.build(),
+            HttpResponse.BodyHandlers.ofString()
+    );
+    calls.get(call.callType()).add(Instant.now());
+
+
+    int statusCode = result.statusCode();
+    System.out.println(call.callType().name() + "\tStatus Code ______________________________________" + statusCode);
+
+    if (result.statusCode() != 200) {
+        throw new Exception("Leo   Request failed");
+    } else {
         RS response = MAPPER.readValue(result.body(), call.responseType());
         call.onResult().accept(response);
     }
+}
 }
