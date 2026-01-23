@@ -126,7 +126,7 @@ private <RQ, RS> void handleCallNow(ServiceCall<RQ, RS> call) throws IOException
 
 
     int statusCode = result.statusCode();
-    System.out.println(call.callType().name() + "\tStatus Code ______________________________________" + statusCode);
+    System.out.println("\n" + call.callType().name() + "\nStatus Code ______________________________________" + statusCode);
 
     if (result.statusCode() != 200) {
         throw new Exception("Leo   Request failed");

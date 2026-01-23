@@ -13,12 +13,11 @@ public class ExtendedCommunicator extends LimitedCommunicator{
 
     public void buyMarket(String ticker,
                           double quantity,
-                          Consumer<Integer> responseCodeAction,
                           boolean extendedHours) {
         ServiceCall<Requests.MarketRequest, EmptyRecord> call = new ServiceCall<>(
                 ServiceCallType.PLACE_MARKET_ORDER,
                 null,
-                new Requests.MarketRequest(ticker, quantity, false),
+                new Requests.MarketRequest(ticker, quantity, extendedHours),
                 new TypeReference<EmptyRecord>() {},
                 ignore -> {}
         );
@@ -28,8 +27,7 @@ public class ExtendedCommunicator extends LimitedCommunicator{
 
     public void sellMarket(String ticker,
                            double quantity,
-                           Consumer<Integer> responseCodeAction,
                            boolean extendedHours) {
-        buyMarket(ticker, -quantity, responseCodeAction, extendedHours);
+        buyMarket(ticker, -quantity, extendedHours);
     }
 }
