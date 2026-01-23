@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
 
 
 /**
- * This class can be used for testing, but permanent usage is unrecommended as it doesn't care about RATE-LIMITS
+ * This class can be used for testing, but permanent usage is unrecommended as it doesn't take RATE-LIMITS into account
  */
 @Deprecated
 public class Communicator {

@@ -1,13 +1,11 @@
 package sk.leo.api;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import sk.leo.api.querying.DataService;
 import sk.leo.api.records.AccountSummary;
 import sk.leo.api.records.Instrument;
 import sk.leo.api.records.Position;
 
 import java.time.Duration;
-import java.util.List;
 
 public enum ServiceCallType {
 
@@ -26,7 +24,7 @@ public enum ServiceCallType {
                     new TypeReference<Position[]>() {}, rs -> service.put(this, rs));
         }
     },
-    GET_ALL_AVAILABLE_INSTRUMENTS("instruments", 1, Duration.ofSeconds(50), false) {
+    GET_ALL_AVAILABLE_INSTRUMENTS("instruments", 1, Duration.ofSeconds(50), true) {
         @Override
         public ServiceCall<?, ?> createRefreshCall(DataService service) {
             return new ServiceCall<>(this, null, null,

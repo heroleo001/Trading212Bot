@@ -1,13 +1,7 @@
-package sk.leo.api.querying;
-
-import sk.leo.api.ExtendedCommunicator;
-import sk.leo.api.ServiceCall;
-import sk.leo.api.ServiceCallType;
+package sk.leo.api;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 public class DataService {
     private final ExtendedCommunicator communicator;
