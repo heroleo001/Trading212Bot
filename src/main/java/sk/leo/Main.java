@@ -2,10 +2,7 @@ package sk.leo;
 
 import sk.leo.api.*;
 import sk.leo.api.DataService;
-import sk.leo.api.records.Instrument;
-import sk.leo.api.records.Position;
 
-import java.util.Arrays;
 import java.util.concurrent.CountDownLatch;
 
 public class Main {

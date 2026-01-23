@@ -11,7 +11,10 @@ public class ExtendedCommunicator extends LimitedCommunicator{
         super(header);
     }
 
-    public void buyMarket(String ticker, double quantity, Consumer<Integer> responseCodeAction) throws Exception {
+    public void buyMarket(String ticker,
+                          double quantity,
+                          Consumer<Integer> responseCodeAction,
+                          boolean extendedHours) {
         ServiceCall<Requests.MarketRequest, EmptyRecord> call = new ServiceCall<>(
                 ServiceCallType.PLACE_MARKET_ORDER,
                 null,
@@ -19,10 +22,14 @@ public class ExtendedCommunicator extends LimitedCommunicator{
                 new TypeReference<EmptyRecord>() {},
                 ignore -> {}
         );
+        callService(call);
     }
 
 
-    public void sellMarket(String ticker, double quantity, Consumer<Integer> responseCodeAction) throws Exception {
-        sellMarket(ticker, -quantity, responseCodeAction);
+    public void sellMarket(String ticker,
+                           double quantity,
+                           Consumer<Integer> responseCodeAction,
+                           boolean extendedHours) {
+        buyMarket(ticker, -quantity, responseCodeAction, extendedHours);
     }
 }
