@@ -1,5 +1,7 @@
 package sk.leo.api;
 
+import sk.leo.api.records.Instrument;
+
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
@@ -15,7 +17,9 @@ public class DataService {
 
 
     public DataService(String header, CountDownLatch readyLatch) {
-        communicator = new ExtendedCommunicator(header);
+        communicator = new ExtendedCommunicator(
+                header,
+                () -> get(ServiceCallType.GET_ALL_AVAILABLE_INSTRUMENTS, Instrument[].class));
 
         this.readyLatch = readyLatch;
 
@@ -30,7 +34,7 @@ public class DataService {
             public void run() {
                 rereadData();
             }
-        },0, 1000 * 60 * 5);
+        },0, 1000 * 60 * 30);
     }
 
     public <T> T get(ServiceCallType type, Class<T> expected) {

@@ -6,6 +6,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 public record Position(
         BaseCredentials instrument,
         double quantity,
+        double quantityAvailableForTrading,
         Double currentPrice,
         WalletImpact walletImpact
 ) {
