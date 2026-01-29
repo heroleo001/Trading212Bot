@@ -52,7 +52,7 @@ public class ExtendedDataService extends DataService {
                         instrument -> {
                             try {
                                 Optional<String> symbol = twelveDataFetcher.resolveSymbolByIsin(instrument.isin());
-                                return symbol.get();
+                                return symbol.orElse("");
                             } catch (Exception e) {
                                 throw new RuntimeException(e);
                             }

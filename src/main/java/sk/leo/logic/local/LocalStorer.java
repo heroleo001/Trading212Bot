@@ -71,6 +71,7 @@ public class LocalStorer {
                 .resolve("t212_to_symbol.json");
 
         try {
+            Files.createDirectories(path.getParent());
             MAPPER.writeValue(path.toFile(), mapping);
         } catch (IOException e) {
             throw new RuntimeException(e);

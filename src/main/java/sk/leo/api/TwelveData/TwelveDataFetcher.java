@@ -2,6 +2,7 @@ package sk.leo.api.TwelveData;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sun.security.jgss.GSSUtil;
 import sk.leo.api.records.RelevantStockData;
 import sk.leo.logic.TradeHelper;
 
@@ -13,6 +14,7 @@ import java.net.http.HttpResponse;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 
+@Deprecated
 public class TwelveDataFetcher {
     private final String apiKey;
 
@@ -49,28 +51,30 @@ public class TwelveDataFetcher {
                 client.send(request, HttpResponse.BodyHandlers.ofString());
 
         if (response.statusCode() != 200) {
-            return null; // skip failed symbol
+            return Optional.empty(); // skip failed symbol
         }
 
         JsonNode root = mapper.readTree(response.body());
 
         // Market closed, invalid symbol, etc.
         if (!root.has("values")) {
-            return null;
+            return Optional.empty();
         }
 
         JsonNode values = root.get("values");
         if (values.size() < 2) {
-            return null;
+            return Optional.empty();
         }
+        System.out.println(response.body());
 
         double todayClose = values.get(0).get("close").asDouble();
         double yesterdayClose = values.get(1).get("close").asDouble();
         double percentualChange = (todayClose - yesterdayClose) / yesterdayClose;
         // fraction, NOT percent
 
+        String currency = root.get("meta").get("currency").asText();
 
-        return Optional.of(new RelevantStockData(percentualChange, TradeHelper.round2(todayClose)));
+        return Optional.of(new RelevantStockData(percentualChange, TradeHelper.round2(todayClose), currency));
     }
 
 
@@ -101,5 +105,31 @@ public class TwelveDataFetcher {
             return Optional.of(data.get(0).get("symbol").asText());
         }
         return Optional.empty();
+    }
+
+    public Optional<Double> getExchangeRateToEur(String otherCurrency) throws IOException, InterruptedException {
+        if (REQUEST_THIS_DAY.get() >= DAILY_LIMIT) return Optional.empty();
+
+        String url =
+                "https://api.twelvedata.com/exchange_rate" +
+                        "?symbol=" + otherCurrency + "/EUR" +
+                        "&apikey=" + apiKey;
+
+        HttpClient client = HttpClient.newHttpClient();
+        HttpRequest req = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .GET()
+                .build();
+
+        HttpResponse<String> res =
+                client.send(req, HttpResponse.BodyHandlers.ofString());
+        REQUEST_THIS_DAY.incrementAndGet();
+
+        System.out.println("Response: " + res.body());
+
+        JsonNode root = new ObjectMapper().readTree(res.body());
+        JsonNode data = root.get("rate");
+
+        return Optional.of(data.asDouble());
     }
 }

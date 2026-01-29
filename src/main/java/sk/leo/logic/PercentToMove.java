@@ -10,10 +10,7 @@ import sk.leo.logic.local.LocalStorer;
 
 import java.io.IOException;
 import java.time.*;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -51,46 +48,56 @@ public class PercentToMove implements TradingStrategy {
 
     @Override
     public int runDailyAnalysis() {
-        checkAndSellPositions();
-
-        checkAndBuyInstruments();
+        checkAndSellPositions();    //Buy
+        checkAndBuyInstruments();   //Sell
 
         return 0;
     }
 
     private void checkAndBuyInstruments() {
         getBuyQuantities().forEach((ticker, quantity) -> {
-            dataService.getCommunicator().buyMarket(ticker, quantity);
+//            dataService.getCommunicator().buyMarket(ticker, quantity);
+            System.out.println("Would buy " + quantity + " " + ticker);
         });
     }
 
-    private Map<String, Double> getBuyQuantities(){
+    private Map<String, Double> getBuyQuantities() {
         Map<String, RelevantStockData> instrumentsToBuy = getInstrumentsToBuy();
+
+        Map<String, Double> exchangeRateToEur = Set.of("USD", "GBX").stream().collect(Collectors.toMap(
+                p -> p,
+                otherCurrency -> {
+                    try {
+                        return dataService.getTwelveDataFetcher().getExchangeRateToEur(otherCurrency).orElse(0.0);
+                    } catch (IOException | InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                }));
 
         double cashAvailable = dataService.getAccountSummary().cash().availableToTrade();
         double cashPerAsset = TradeHelper.round2(cashAvailable / instrumentsToBuy.size());
 
-        if (cashPerAsset / cashAvailable > onePositionPercentageLimit){
+        if (cashPerAsset / cashAvailable > onePositionPercentageLimit) {
             cashPerAsset = onePositionPercentageLimit * cashAvailable;
         }
 
         final double finalCashPerAsset = cashPerAsset;
-        Map<String, Double> buyQuantities = instrumentsToBuy.keySet().stream().collect(
+
+        return instrumentsToBuy.keySet().stream().collect(
                 Collectors.toMap(
                         ticker -> ticker,
                         ticker -> {
-                            return finalCashPerAsset / instrumentsToBuy.get(ticker).stockPrice();
+                            RelevantStockData stockData = instrumentsToBuy.get(ticker);
+                            return finalCashPerAsset / stockData.stockPrice() * exchangeRateToEur.get(stockData.currency());
                         })
         );
-
-        return buyQuantities;
     }
 
     /**
      *
      * @return All the valid instruments with depreciation > limit
      */
-    private Map<String, RelevantStockData> getInstrumentsToBuy(){
+    private Map<String, RelevantStockData> getInstrumentsToBuy() {
         Map<String, Instrument> validInstruments = dataService.getAllValidInstruments();
         System.out.println("There are " + validInstruments.size() + " tradable stocks:");
 
@@ -103,7 +110,12 @@ public class PercentToMove implements TradingStrategy {
             try {
                 Optional<RelevantStockData> optionalStockData = twelveDataFetcher.fetchRelevantStockData(
                         tickerSymbolMap.get(instrument.ticker()));
-                RelevantStockData stockData = optionalStockData.orElse(new RelevantStockData(0.0, 0));
+                RelevantStockData stockData;
+                if (optionalStockData.isEmpty()) {
+                    return;
+                } else {
+                    stockData = optionalStockData.get();
+                }
 
                 if (stockData.percentualChange() < depreciationLimit) {
                     result.put(instrument.ticker(), stockData);
@@ -142,7 +154,7 @@ public class PercentToMove implements TradingStrategy {
         return Duration.between(now, nextRun).getSeconds();
     }
 
-    private void checkAndSellPositions(){
+    private void checkAndSellPositions() {
         List<Position> positions = dataService.getOpenPositions();
 
         /// Sell the positions that are up 3%

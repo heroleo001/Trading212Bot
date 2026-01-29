@@ -18,6 +18,8 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 public class LimitedCommunicator {
     private static final String BASE_URL =
             "https://demo.trading212.com";
+    private static final String TD_BASE_URL =
+            "https://api.twelvedata.com";
 
     private final Map<ServiceCallType, Queue<ServiceCall<?, ?>>> queues = new ConcurrentHashMap<>();
     private final Map<ServiceCallType, Queue<Instant>> calls = new ConcurrentHashMap<>();
@@ -81,7 +83,7 @@ public class LimitedCommunicator {
     });
 }
 
-private <RQ, RS> void handleCallNow(ServiceCall<RQ, RS> call) throws IOException, InterruptedException, Exception {
+private <RQ, RS> void handleCallNow(ServiceCall<RQ, RS> call) throws Exception {
     ResolvedEndpoint ep = EndpointResolver.resolve(call.callType());
     String endpointPath = ep.path();
 

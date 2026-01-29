@@ -1,4 +1,4 @@
-package sk.leo.logic.local;
+package sk.leo.api;
 
 public record InstrumentMapping(
         String isin,

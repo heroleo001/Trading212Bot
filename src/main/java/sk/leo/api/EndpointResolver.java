@@ -5,10 +5,20 @@ import sk.leo.api.records.ResolvedEndpoint;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 public class EndpointResolver {
 
+    private static final Map<ServiceCallType, ResolvedEndpoint> twelveDataServiceCalls =
+            Map.of(ServiceCallType.EXCHANGE_RATE, new ResolvedEndpoint("get", "exchange_rate", null),
+                    ServiceCallType.SYMBOL_SEARCH, new ResolvedEndpoint("get", "symbol_search", null),
+                    ServiceCallType.TIME_SERIES, new ResolvedEndpoint("get", "time_series", null)
+            );
+
     public static ResolvedEndpoint resolve(ServiceCallType key) {
+        if (twelveDataServiceCalls.containsKey(key)){
+            return twelveDataServiceCalls.get(key);
+        }
 
         for (var pathEntry : ApiRegistryRead.api().paths().entrySet()) {
 

@@ -1,7 +1,6 @@
 package sk.leo;
 
 import sk.leo.api.*;
-import sk.leo.api.TwelveData.TwelveDataFetcher;
 import sk.leo.logic.PercentToMove;
 import sk.leo.logic.TradingStrategy;
 
@@ -15,9 +14,6 @@ public class Main {
         strategy.runDailyAnalysis();
 
 
-
-
-//        System.out.println(dataFetcher.fetchDailyPercentualChange(List.of("AAPL", "MSFT")));
 
 //        testCall();
     }

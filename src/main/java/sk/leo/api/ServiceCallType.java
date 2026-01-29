@@ -68,17 +68,36 @@ public enum ServiceCallType {
         public ServiceCall<?, ?> createRefreshCall(DataService service) {
             throw new UnsupportedOperationException("this does not have a response");
         }
+    },
+
+
+    TIME_SERIES("time_series", 8, Duration.ofSeconds(60), false){
+        @Override
+        public ServiceCall<?, ?> createRefreshCall(DataService service) {
+            throw new UnsupportedOperationException("this does not have a response");
+        }
+    },
+    EXCHANGE_RATE("exchange_rate", 8, Duration.ofSeconds(60), false){
+        @Override
+        public ServiceCall<?, ?> createRefreshCall(DataService service) {
+            throw new UnsupportedOperationException("this does not have a response");
+        }
+    },
+    SYMBOL_SEARCH("symbol_search", Double.POSITIVE_INFINITY, Duration.ZERO, false){
+        @Override
+        public ServiceCall<?, ?> createRefreshCall(DataService service) {
+            throw new UnsupportedOperationException("this does not have a response");
+        }
     };
 
 
 
-
     private final String operationId;
-    private final int operationLimit;
+    private final double operationLimit;
     private final Duration timePeriod;
     private final boolean refreshData;
 
-    ServiceCallType(String operationId, int operationLimit, Duration timePeriod, boolean refreshData) {
+    ServiceCallType(String operationId, double operationLimit, Duration timePeriod, boolean refreshData) {
         this.operationId = operationId;
         this.operationLimit = operationLimit;
         this.timePeriod = timePeriod;
@@ -95,7 +114,7 @@ public enum ServiceCallType {
         return timePeriod;
     }
 
-    public int getOperationLimit() {
+    public double getOperationLimit() {
         return operationLimit;
     }
 
