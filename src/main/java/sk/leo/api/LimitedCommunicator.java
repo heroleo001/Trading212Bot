@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import sk.leo.api.records.ResolvedEndpoint;
 
-import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -16,11 +15,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class LimitedCommunicator {
-    private static final String BASE_URL =
-            "https://demo.trading212.com";
-    private static final String TD_BASE_URL =
-            "https://api.twelvedata.com";
-
     private final Map<ServiceCallType, Queue<ServiceCall<?, ?>>> queues = new ConcurrentHashMap<>();
     private final Map<ServiceCallType, Queue<Instant>> calls = new ConcurrentHashMap<>();
 
@@ -80,61 +74,65 @@ public class LimitedCommunicator {
                     throw new RuntimeException(e);
                 }
             }
-    });
-}
-
-private <RQ, RS> void handleCallNow(ServiceCall<RQ, RS> call) throws Exception {
-    ResolvedEndpoint ep = EndpointResolver.resolve(call.callType());
-    String endpointPath = ep.path();
-
-    ///  Adds path-params if necessary
-    if (call.pathParams() != null) {
-        for (var e : call.pathParams().entrySet()) {
-            endpointPath = endpointPath.replace("{" + e.getKey() + "}", e.getValue());
-        }
+        });
     }
 
+    private <RQ, RS> void handleCallNow(ServiceCall<RQ, RS> call) throws Exception {
+        ResolvedEndpoint ep = call.callType().getEndpoint();
 
-    HttpRequest.Builder builder = HttpRequest.newBuilder()
-            .uri(URI.create(BASE_URL + endpointPath))
-            .header("Authorization", header)
-            .header("Content-Type", "application/json");
-
-
-    if (call.payload() != null) {
-        try {
-            builder.method(
-                    ep.method(),
-                    HttpRequest.BodyPublishers.ofString(
-                            MAPPER.writeValueAsString(call.payload())
-                    )
-            );
-        } catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
-        }
-    } else {
-        builder.method(
+//        ///  Adds path-params if necessary
+//        if (call.pathParams() != null) {
+//            for (var e : call.pathParams().entrySet()) {
+//                endpointPath = endpointPath.replace("{" + e.getKey() + "}", e.getValue());
+//            }
+//        }
+//
+//
+//        HttpRequest.Builder builder = HttpRequest.newBuilder()
+//                .uri(URI.create(call.callType().getProvider().getBaseUrl() + "/" + endpointPath))
+//                .header("Authorization", header)
+//                .header("Content-Type", "application/json");
+//
+//
+//        if (call.payload() != null) {
+//            try {
+//                builder.method(
+//                        ep.method(),
+//                        HttpRequest.BodyPublishers.ofString(
+//                                MAPPER.writeValueAsString(call.payload())
+//                        )
+//                );
+//            } catch (JsonProcessingException e) {
+//                throw new RuntimeException(e);
+//            }
+//        } else {
+//            builder.method(
+//                    ep.method(),
+//                    HttpRequest.BodyPublishers.noBody()
+//            );
+//        }
+        HttpRequest request = call.callType().createRequest(
+                header,
+                call.pathParams(),
                 ep.method(),
-                HttpRequest.BodyPublishers.noBody()
+                call.payload());
+
+        /// Sending Request
+        HttpResponse<String> httpResponse = CLIENT.send(
+                request,
+                HttpResponse.BodyHandlers.ofString()
         );
+        calls.get(call.callType()).add(Instant.now());
+
+
+        int statusCode = httpResponse.statusCode();
+        System.out.println("\n" + call.callType().name() + "\nStatus Code ______________________________________" + statusCode);
+
+        if (httpResponse.statusCode() != 200) {
+            throw new Exception("Leo   Request failed");
+        } else {
+            RS responseObj = MAPPER.readValue(httpResponse.body(), call.responseType());
+            call.onResult().accept(responseObj, httpResponse.body());
+        }
     }
-
-    /// Sending Request
-    HttpResponse<String> result = CLIENT.send(
-            builder.build(),
-            HttpResponse.BodyHandlers.ofString()
-    );
-    calls.get(call.callType()).add(Instant.now());
-
-
-    int statusCode = result.statusCode();
-    System.out.println("\n" + call.callType().name() + "\nStatus Code ______________________________________" + statusCode);
-
-    if (result.statusCode() != 200) {
-        throw new Exception("Leo   Request failed");
-    } else {
-        RS response = MAPPER.readValue(result.body(), call.responseType());
-        call.onResult().accept(response);
-    }
-}
 }

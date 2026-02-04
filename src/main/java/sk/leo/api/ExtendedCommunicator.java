@@ -8,11 +8,13 @@ import sk.leo.api.records.Requests;
 
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Optional;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
-public class ExtendedCommunicator extends LimitedCommunicator{
+public class ExtendedCommunicator extends LimitedCommunicator {
     private final Supplier<Instrument[]> instruments;
 
     public ExtendedCommunicator(String header, Supplier<Instrument[]> instruments) {
@@ -31,8 +33,10 @@ public class ExtendedCommunicator extends LimitedCommunicator{
                 ServiceCallType.PLACE_MARKET_ORDER,
                 null,
                 new Requests.MarketRequest(ticker, quantity, supportsExtendedHours(ticker)),
-                new TypeReference<EmptyRecord>() {},
-                ignore -> {}
+                new TypeReference<EmptyRecord>() {
+                },
+                (ignore, ignore1) -> {
+                }
         );
         callService(call);
     }
@@ -43,13 +47,13 @@ public class ExtendedCommunicator extends LimitedCommunicator{
         buyMarket(ticker, -quantity);
     }
 
-    public void sellPosition(Position toSell){
+    public void sellPosition(Position toSell) {
         System.out.println("Selling " + toSell.quantityAvailableForTrading() + " " + toSell.name() + " stock");
 
         sellMarket(toSell.ticker(), toSell.quantityAvailableForTrading());
     }
 
-    private Map<String, Instrument> getInstrumentsAsMap(){
+    private Map<String, Instrument> getInstrumentsAsMap() {
         return Arrays.stream(instruments.get())
                 .collect(Collectors.toMap(
                         Instrument::ticker,
@@ -57,7 +61,17 @@ public class ExtendedCommunicator extends LimitedCommunicator{
                 ));
     }
 
-    private boolean supportsExtendedHours(String ticker){
+    private boolean supportsExtendedHours(String ticker) {
         return getInstrumentsAsMap().get(ticker).extendedHours();
+    }
+
+    public void resolveSymbolByIsin(String isin, BiConsumer<EmptyRecord, String> onResult) {
+        ServiceCall<EmptyRecord, EmptyRecord> serviceCall = new ServiceCall<>(
+                ServiceCallType.SYMBOL_SEARCH,
+                Map.of(UrlParamType.ISIN, isin, UrlParamType.API_KEY, Auth.getTdApiKey()),
+                null,
+                new TypeReference<EmptyRecord>() {},
+                onResult
+        );
     }
 }

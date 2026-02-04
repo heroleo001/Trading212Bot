@@ -12,12 +12,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.stream.Collectors;
 
 public class ExtendedDataService extends DataService {
-    private final TwelveDataFetcher twelveDataFetcher = new TwelveDataFetcher(Auth.getTdApiKey());
-
-    public TwelveDataFetcher getTwelveDataFetcher() {
-        return twelveDataFetcher;
-    }
-
     public ExtendedDataService(String header, CountDownLatch readyLatch) {
         super(header, readyLatch);
     }

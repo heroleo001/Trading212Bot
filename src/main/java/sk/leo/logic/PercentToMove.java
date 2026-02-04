@@ -48,8 +48,8 @@ public class PercentToMove implements TradingStrategy {
 
     @Override
     public int runDailyAnalysis() {
-        checkAndSellPositions();    //Buy
-        checkAndBuyInstruments();   //Sell
+        checkAndSellPositions();    //Sell
+//        checkAndBuyInstruments();   //Buy
 
         return 0;
     }

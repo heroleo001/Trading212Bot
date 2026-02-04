@@ -16,7 +16,7 @@ public class EndpointResolver {
             );
 
     public static ResolvedEndpoint resolve(ServiceCallType key) {
-        if (twelveDataServiceCalls.containsKey(key)){
+        if (key.getProvider() == ServiceCallType.Provider.TWELVE_DATA){
             return twelveDataServiceCalls.get(key);
         }
 
