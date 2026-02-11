@@ -1,22 +1,22 @@
 package sk.leo.api;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import sk.leo.api.records.ResolvedEndpoint;
 
-import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicInteger;
 
-public class LimitedCommunicator {
+public class RateLimitedCommunicator {
     private final Map<ServiceCallType, Queue<ServiceCall<?, ?>>> queues = new ConcurrentHashMap<>();
-    private final Map<ServiceCallType, Queue<Instant>> calls = new ConcurrentHashMap<>();
+    private final Map<ServiceCallType, Deque<Instant>> calls = new ConcurrentHashMap<>();
 
     private static final ObjectMapper MAPPER = new ObjectMapper().configure(
             DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES,
@@ -24,12 +24,14 @@ public class LimitedCommunicator {
     );
     private static final HttpClient CLIENT = HttpClient.newHttpClient();
 
+    private final AtomicInteger numberOfTDRequests = new AtomicInteger(0);
+
     private final String header;
 
-    public LimitedCommunicator(String header) {
+    public RateLimitedCommunicator(String header) {
         this.header = header;
         Arrays.stream(ServiceCallType.values()).forEach(callType -> {
-            calls.put(callType, new ConcurrentLinkedQueue<>());
+            calls.put(callType, new ConcurrentLinkedDeque<>());
             queues.put(callType, new ConcurrentLinkedQueue<>());
         });
 
@@ -51,14 +53,29 @@ public class LimitedCommunicator {
     }
 
     private boolean canCallNow(ServiceCall<?, ?> call) {
-        ServiceCallType type = call.callType();
-        Queue<Instant> q = calls.get(type);
+        /// Temp solution to limit TD calls
+        if (call.callType().getProvider() == ServiceCallType.Provider.TWELVE_DATA &&
+                numberOfTDRequests.get() >= 800){
+            return false;
+        }
 
-        Instant cutoffTime = Instant.now().minus(type.getTimePeriod()); // Instant after which the calls are within the time period for the Call
+        ServiceCallType callType = call.callType();
+        Set<ServiceCallType> callTypes = getSetOfAllSharedLimitCalls(callType);
 
-        q.removeIf(cutoffTime::isAfter);
+        Instant cutoffTime = Instant.now().minus(callType.getTimePeriod()); // Instant after which the calls are within the time period for the Call
 
-        return q.size() < type.getOperationLimit();
+        int callCounter = 0;
+        for (var t : callTypes){
+            callCounter += getCallAmountAfterCutoffTime(t, cutoffTime);
+        }
+
+        return callCounter < callType.getOperationLimit();
+    }
+
+    private int getCallAmountAfterCutoffTime(ServiceCallType callType, Instant cutoffTime){
+        Deque<Instant> recentCalls = calls.get(callType);
+        recentCalls.removeIf(cutoffTime::isAfter);
+        return recentCalls.size();
     }
 
     private <RS> void handleQueue() {
@@ -80,37 +97,6 @@ public class LimitedCommunicator {
     private <RQ, RS> void handleCallNow(ServiceCall<RQ, RS> call) throws Exception {
         ResolvedEndpoint ep = call.callType().getEndpoint();
 
-//        ///  Adds path-params if necessary
-//        if (call.pathParams() != null) {
-//            for (var e : call.pathParams().entrySet()) {
-//                endpointPath = endpointPath.replace("{" + e.getKey() + "}", e.getValue());
-//            }
-//        }
-//
-//
-//        HttpRequest.Builder builder = HttpRequest.newBuilder()
-//                .uri(URI.create(call.callType().getProvider().getBaseUrl() + "/" + endpointPath))
-//                .header("Authorization", header)
-//                .header("Content-Type", "application/json");
-//
-//
-//        if (call.payload() != null) {
-//            try {
-//                builder.method(
-//                        ep.method(),
-//                        HttpRequest.BodyPublishers.ofString(
-//                                MAPPER.writeValueAsString(call.payload())
-//                        )
-//                );
-//            } catch (JsonProcessingException e) {
-//                throw new RuntimeException(e);
-//            }
-//        } else {
-//            builder.method(
-//                    ep.method(),
-//                    HttpRequest.BodyPublishers.noBody()
-//            );
-//        }
         HttpRequest request = call.callType().createRequest(
                 header,
                 call.pathParams(),
@@ -124,15 +110,27 @@ public class LimitedCommunicator {
         );
         calls.get(call.callType()).add(Instant.now());
 
+        /// Temp increment of TD call counter
+        if (call.callType().getProvider() == ServiceCallType.Provider.TWELVE_DATA && call.callType().getOperationLimit() != Double.POSITIVE_INFINITY)
+            numberOfTDRequests.incrementAndGet();
 
         int statusCode = httpResponse.statusCode();
         System.out.println("\n" + call.callType().name() + "\nStatus Code ______________________________________" + statusCode);
 
         if (httpResponse.statusCode() != 200) {
-            throw new Exception("Leo   Request failed");
+            System.out.println("Error\nCall Failed");
         } else {
             RS responseObj = MAPPER.readValue(httpResponse.body(), call.responseType());
             call.onResult().accept(responseObj, httpResponse.body());
+        }
+    }
+
+    private Set<ServiceCallType> getSetOfAllSharedLimitCalls(ServiceCallType callType){
+        RateLimitGroup limitGroup = callType.getRateLimitGroup();
+        if (limitGroup == null){
+            return EnumSet.of(callType);
+        } else {
+            return limitGroup.getCallTypes();
         }
     }
 }

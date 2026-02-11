@@ -1,24 +1,13 @@
 package sk.leo.logic.local;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import sk.leo.api.Auth;
-import sk.leo.api.TwelveData.TwelveDataFetcher;
-import sk.leo.api.records.Instrument;
 
-import java.io.File;
 import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
-import java.time.LocalDate;
 import java.util.*;
 
 public class LocalStorer {
@@ -26,6 +15,8 @@ public class LocalStorer {
             .enable(SerializationFeature.INDENT_OUTPUT);
 
     private static final Path BASE_DIR;
+
+    private static final Map<String, String> TICKER_SYMBOL_MAP = new HashMap<>();
 
     static {
         BASE_DIR = Paths.get(
@@ -65,14 +56,19 @@ public class LocalStorer {
         }
     }
 
-    public static void storeTickerSymbolMapping(Map<String, String> mapping) {
+    public static void storeTickerSymbolMapping(String ticker, String symbol) {
+        TICKER_SYMBOL_MAP.put(ticker, symbol);
+        storeMappingToFile();
+    }
+
+    public static void storeMappingToFile(){
         Path path = BASE_DIR
                 .resolve("mapping")
                 .resolve("t212_to_symbol.json");
 
         try {
             Files.createDirectories(path.getParent());
-            MAPPER.writeValue(path.toFile(), mapping);
+            MAPPER.writeValue(path.toFile(), TICKER_SYMBOL_MAP);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

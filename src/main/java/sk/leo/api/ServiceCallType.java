@@ -11,10 +11,13 @@ import sk.leo.api.records.ResolvedEndpoint;
 import java.net.URI;
 import java.net.http.HttpRequest;
 import java.time.Duration;
+import java.util.Arrays;
+import java.util.Iterator;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 public enum ServiceCallType {
-    GET_ACCOUNT_SUMMARY("getAccountSummary", 1, Duration.ofSeconds(5), true, Provider.TRADING_212) {
+    GET_ACCOUNT_SUMMARY("getAccountSummary", 1, Duration.ofSeconds(5), true, Provider.TRADING_212, null) {
         @Override
         public ServiceCall<?, ?> createRefreshCall(DataService service) {
             return new ServiceCall<>(this, null, null,
@@ -28,12 +31,12 @@ public enum ServiceCallType {
                     .uri(URI.create(getPathWithParams(getProvider().getBaseUrl() + "/" + getEndpoint().path(), params)))
                     .header("Authorization", authorization)
                     .header("Content-Type", "application/json");
-            addMethod(builder, method, payload);
+            addMethodToBuilder(builder, method, payload);
             return builder.build();
         }
     },
 
-    GET_OPEN_POSITIONS("getPositions", 1, Duration.ofSeconds(1), true, Provider.TRADING_212) {
+    GET_OPEN_POSITIONS("getPositions", 1, Duration.ofSeconds(1), true, Provider.TRADING_212, null) {
         @Override
         public ServiceCall<?, ?> createRefreshCall(DataService service) {
             return new ServiceCall<>(this, null, null,
@@ -47,11 +50,11 @@ public enum ServiceCallType {
                     .uri(URI.create(getPathWithParams(getProvider().getBaseUrl() + "/" + getEndpoint().path(), params)))
                     .header("Authorization", authorization)
                     .header("Content-Type", "application/json");
-            addMethod(builder, method, payload);
+            addMethodToBuilder(builder, method, payload);
             return builder.build();
         }
     },
-    GET_ALL_AVAILABLE_INSTRUMENTS("instruments", 1, Duration.ofSeconds(50), true, Provider.TRADING_212) {
+    GET_ALL_AVAILABLE_INSTRUMENTS("instruments", 1, Duration.ofSeconds(50), false, Provider.TRADING_212, null) {
         @Override
         public ServiceCall<?, ?> createRefreshCall(DataService service) {
             return new ServiceCall<>(this, null, null,
@@ -65,12 +68,12 @@ public enum ServiceCallType {
                     .uri(URI.create(getPathWithParams(getProvider().getBaseUrl() + "/" + getEndpoint().path(), params)))
                     .header("Authorization", authorization)
                     .header("Content-Type", "application/json");
-            addMethod(builder, method, payload);
+            addMethodToBuilder(builder, method, payload);
             return builder.build();
         }
     },
 
-    PLACE_MARKET_ORDER("placeMarketOrder", 50, Duration.ofSeconds(60), false, Provider.TRADING_212) {
+    PLACE_MARKET_ORDER("placeMarketOrder", 50, Duration.ofSeconds(60), false, Provider.TRADING_212, null) {
         @Override
         public ServiceCall<?, ?> createRefreshCall(DataService service) {
             throw new UnsupportedOperationException("this does not have a response");
@@ -82,11 +85,11 @@ public enum ServiceCallType {
                     .uri(URI.create(getPathWithParams(getProvider().getBaseUrl() + "/" + getEndpoint().path(), params)))
                     .header("Authorization", authorization)
                     .header("Content-Type", "application/json");
-            addMethod(builder, method, payload);
+            addMethodToBuilder(builder, method, payload);
             return builder.build();
         }
     },
-    PLACE_LIMIT_ORDER("placeLimitOrder", 1, Duration.ofSeconds(2), false, Provider.TRADING_212) {
+    PLACE_LIMIT_ORDER("placeLimitOrder", 1, Duration.ofSeconds(2), false, Provider.TRADING_212, null) {
         @Override
         public ServiceCall<?, ?> createRefreshCall(DataService service) {
             throw new UnsupportedOperationException("this does not have a response");
@@ -98,11 +101,11 @@ public enum ServiceCallType {
                     .uri(URI.create(getPathWithParams(getProvider().getBaseUrl() + "/" + getEndpoint().path(), params)))
                     .header("Authorization", authorization)
                     .header("Content-Type", "application/json");
-            addMethod(builder, method, payload);
+            addMethodToBuilder(builder, method, payload);
             return builder.build();
         }
     },
-    PLACE_STOP_ORDER("placeStopOrder_1", 1, Duration.ofSeconds(2), false, Provider.TRADING_212) {
+    PLACE_STOP_ORDER("placeStopOrder_1", 1, Duration.ofSeconds(2), false, Provider.TRADING_212, null) {
         @Override
         public ServiceCall<?, ?> createRefreshCall(DataService service) {
             throw new UnsupportedOperationException("this does not have a response");
@@ -114,11 +117,11 @@ public enum ServiceCallType {
                     .uri(URI.create(getPathWithParams(getProvider().getBaseUrl() + "/" + getEndpoint().path(), params)))
                     .header("Authorization", authorization)
                     .header("Content-Type", "application/json");
-            addMethod(builder, method, payload);
+            addMethodToBuilder(builder, method, payload);
             return builder.build();
         }
     },
-    PLACE_STOP_LIMIT_ORDER("place   StopOrder", 1, Duration.ofSeconds(2), false, Provider.TRADING_212) {
+    PLACE_STOP_LIMIT_ORDER("place   StopOrder", 1, Duration.ofSeconds(2), false, Provider.TRADING_212, null) {
         @Override
         public ServiceCall<?, ?> createRefreshCall(DataService service) {
             throw new UnsupportedOperationException("this does not have a response");
@@ -130,7 +133,7 @@ public enum ServiceCallType {
                     .uri(URI.create(getPathWithParams(getProvider().getBaseUrl() + "/" + getEndpoint().path(), params)))
                     .header("Authorization", authorization)
                     .header("Content-Type", "application/json");
-            addMethod(builder, method, payload);
+            addMethodToBuilder(builder, method, payload);
             return builder.build();
         }
     },
@@ -149,7 +152,7 @@ public enum ServiceCallType {
 //    },
 
 
-    TIME_SERIES("time_series", 8, Duration.ofSeconds(60), false, Provider.TWELVE_DATA) {
+    TIME_SERIES("time_series", 8, Duration.ofSeconds(60), false, Provider.TWELVE_DATA, RateLimitGroup.TWELVE_DATA) {
         @Override
         public ServiceCall<?, ?> createRefreshCall(DataService service) {
             throw new UnsupportedOperationException("this does not have a response");
@@ -158,12 +161,12 @@ public enum ServiceCallType {
         @Override
         public HttpRequest createRequest(String authorization, Map<UrlParamType, String> params, String method, Object payload) {
             HttpRequest.Builder builder = HttpRequest.newBuilder()
-                    .uri(URI.create(getPathWithParams(getProvider().getBaseUrl() + "/" + getEndpoint().path(), params)));
-            addMethod(builder, method, payload);
+                    .uri(URI.create(getPathWithParams(getProvider().getBaseUrl() + "/" + getEndpoint().path(), params)))
+                    .GET();
             return builder.build();
         }
     },
-    EXCHANGE_RATE("exchange_rate", 8, Duration.ofSeconds(60), false, Provider.TWELVE_DATA) {
+    EXCHANGE_RATE("exchange_rate", 8, Duration.ofSeconds(60), false, Provider.TWELVE_DATA, RateLimitGroup.TWELVE_DATA) {
         @Override
         public ServiceCall<?, ?> createRefreshCall(DataService service) {
             throw new UnsupportedOperationException("this does not have a response");
@@ -172,12 +175,12 @@ public enum ServiceCallType {
         @Override
         public HttpRequest createRequest(String authorization, Map<UrlParamType, String> params, String method, Object payload) {
             HttpRequest.Builder builder = HttpRequest.newBuilder()
-                    .uri(URI.create(getPathWithParams(getProvider().getBaseUrl() + "/" + getEndpoint().path(), params)));
-            addMethod(builder, method, payload);
+                    .uri(URI.create(getPathWithParams(getProvider().getBaseUrl() + "/" + getEndpoint().path(), params)))
+                    .GET();
             return builder.build();
         }
     },
-    SYMBOL_SEARCH("symbol_search", Double.POSITIVE_INFINITY, Duration.ZERO, false, Provider.TWELVE_DATA) {
+    SYMBOL_SEARCH("symbol_search", Double.POSITIVE_INFINITY, Duration.ZERO, false, Provider.TWELVE_DATA, null) {
         @Override
         public ServiceCall<?, ?> createRefreshCall(DataService service) {
             throw new UnsupportedOperationException("this does not have a response");
@@ -186,13 +189,13 @@ public enum ServiceCallType {
         @Override
         public HttpRequest createRequest(String authorization, Map<UrlParamType, String> params, String method, Object payload) {
             HttpRequest.Builder builder = HttpRequest.newBuilder()
-                    .uri(URI.create(getPathWithParams(getProvider().getBaseUrl() + "/" + getEndpoint().path(), params)));
-            addMethod(builder, method, payload);
+                    .uri(URI.create(getPathWithParams(getProvider().getBaseUrl() + "/" + getEndpoint().path(), params)))
+                    .GET();
             return builder.build();
         }
     };
 
-    private static void addMethod(HttpRequest.Builder builder, String method, Object payload) {
+    private static void addMethodToBuilder(HttpRequest.Builder builder, String method, Object payload) {
         try {
             if (payload != null) {
                 builder.method(method,
@@ -214,14 +217,17 @@ public enum ServiceCallType {
     private final Duration timePeriod;
     private final boolean refreshData;
     private final Provider provider;
+    private final RateLimitGroup rateLimitGroup;
+
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    ServiceCallType(String operationId, double operationLimit, Duration timePeriod, boolean refreshData, Provider provider) {
+    ServiceCallType(String operationId, double operationLimit, Duration timePeriod, boolean refreshData, Provider provider, RateLimitGroup rateLimitGroup) {
         this.operationId = operationId;
         this.operationLimit = operationLimit;
         this.timePeriod = timePeriod;
         this.refreshData = refreshData;
         this.provider = provider;
+        this.rateLimitGroup = rateLimitGroup;
     }
 
 
@@ -229,18 +235,19 @@ public enum ServiceCallType {
         if (urlParams == null) return basePath;
         if (urlParams.isEmpty()) return basePath;
 
-        StringBuilder basePathBuilder = new StringBuilder(basePath);
-        basePathBuilder.append("?");
-        for (var paramType : urlParams.keySet()) {
-            basePathBuilder.append(paramType.getAsString(urlParams.get(paramType)));
-            basePathBuilder.append("&");
-        }
-        return basePathBuilder.toString();
+        String params = urlParams.entrySet().stream()
+                .map(e -> e.getKey().getAsString(e.getValue()))
+                .collect(Collectors.joining("&"));
 
+        return basePath + "?" + params;
     }
 
     public String operationId() {
         return operationId;
+    }
+
+    public RateLimitGroup getRateLimitGroup() {
+        return rateLimitGroup;
     }
 
     public Duration getTimePeriod() {

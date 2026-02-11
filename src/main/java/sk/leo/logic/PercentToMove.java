@@ -1,20 +1,16 @@
 package sk.leo.logic;
 
 import sk.leo.api.Auth;
+import sk.leo.api.ExtendedCommunicator;
 import sk.leo.api.ExtendedDataService;
-import sk.leo.api.TwelveData.TwelveDataFetcher;
 import sk.leo.api.records.Instrument;
 import sk.leo.api.records.Position;
 import sk.leo.api.records.RelevantStockData;
 import sk.leo.logic.local.LocalStorer;
 
-import java.io.IOException;
 import java.time.*;
 import java.util.*;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
 public class PercentToMove implements TradingStrategy {
@@ -24,55 +20,39 @@ public class PercentToMove implements TradingStrategy {
     public final double depreciationLimit;
     public final double onePositionPercentageLimit;
 
+    private final Map<String, Instrument> validInstruments;
+
     private static final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
     public PercentToMove(double appreciationLimit, double depreciationLimit, double onePositionPercentageLimit) {
         this.appreciationLimit = appreciationLimit;
         this.depreciationLimit = depreciationLimit;
         this.onePositionPercentageLimit = onePositionPercentageLimit;
-        CountDownLatch latch = new CountDownLatch(1);
 
-        dataService = new ExtendedDataService(Auth.header(), latch);
-
-        /// Assure all data is loaded before moving on
-        try {
-            latch.await();
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
+        dataService = new ExtendedDataService(Auth.header());
 
         System.out.println("All data loaded!");
 
-        dataService.storeInstrumentMapping();
+        dataService.storeInstrumentSymbolMapping();
+        validInstruments = dataService.getAllValidInstruments();
     }
 
     @Override
     public int runDailyAnalysis() {
         checkAndSellPositions();    //Sell
-//        checkAndBuyInstruments();   //Buy
-
+        checkAndBuyInstruments();   //Buy
+//        System.out.println("HELOO" + LocalStorer.loadTickerSymbolMapping().get("AIRE_US_EQ"));
         return 0;
     }
 
     private void checkAndBuyInstruments() {
-        getBuyQuantities().forEach((ticker, quantity) -> {
-//            dataService.getCommunicator().buyMarket(ticker, quantity);
-            System.out.println("Would buy " + quantity + " " + ticker);
-        });
+        for (var stock : getBuyQuantities().entrySet()){
+            dataService.getCommunicator().buyMarket(stock.getKey(), stock.getValue());
+        }
     }
 
-    private Map<String, Double> getBuyQuantities() {
+    private Map<String, Integer> getBuyQuantities() {
         Map<String, RelevantStockData> instrumentsToBuy = getInstrumentsToBuy();
-
-        Map<String, Double> exchangeRateToEur = Set.of("USD", "GBX").stream().collect(Collectors.toMap(
-                p -> p,
-                otherCurrency -> {
-                    try {
-                        return dataService.getTwelveDataFetcher().getExchangeRateToEur(otherCurrency).orElse(0.0);
-                    } catch (IOException | InterruptedException e) {
-                        throw new RuntimeException(e);
-                    }
-                }));
 
         double cashAvailable = dataService.getAccountSummary().cash().availableToTrade();
         double cashPerAsset = TradeHelper.round2(cashAvailable / instrumentsToBuy.size());
@@ -88,7 +68,7 @@ public class PercentToMove implements TradingStrategy {
                         ticker -> ticker,
                         ticker -> {
                             RelevantStockData stockData = instrumentsToBuy.get(ticker);
-                            return finalCashPerAsset / stockData.stockPrice() * exchangeRateToEur.get(stockData.currency());
+                            return (int) (finalCashPerAsset / stockData.stockPrice() * dataService.getExchangeRateToEur(stockData.currency()));
                         })
         );
     }
@@ -98,34 +78,61 @@ public class PercentToMove implements TradingStrategy {
      * @return All the valid instruments with depreciation > limit
      */
     private Map<String, RelevantStockData> getInstrumentsToBuy() {
-        Map<String, Instrument> validInstruments = dataService.getAllValidInstruments();
         System.out.println("There are " + validInstruments.size() + " tradable stocks:");
 
-        TwelveDataFetcher twelveDataFetcher = dataService.getTwelveDataFetcher();
         Map<String, String> tickerSymbolMap = LocalStorer.loadTickerSymbolMapping();
 
         Map<String, RelevantStockData> result = new HashMap<>();
+        CountDownLatch latch = new CountDownLatch(validInstruments.size());
+        Set<String> toRemove = ConcurrentHashMap.newKeySet();
 
-        validInstruments.values().forEach(instrument -> {
-            try {
-                Optional<RelevantStockData> optionalStockData = twelveDataFetcher.fetchRelevantStockData(
-                        tickerSymbolMap.get(instrument.ticker()));
-                RelevantStockData stockData;
-                if (optionalStockData.isEmpty()) {
-                    return;
-                } else {
-                    stockData = optionalStockData.get();
-                }
-
-                if (stockData.percentualChange() < depreciationLimit) {
-                    result.put(instrument.ticker(), stockData);
-                }
-            } catch (IOException | InterruptedException e) {
-                throw new RuntimeException(e);
+        for (var instrument : validInstruments.values()) {
+            String symbol = tickerSymbolMap.get(instrument.ticker());
+            if (symbol == null) {
+                toRemove.add(instrument.ticker());
+                latch.countDown();
+                continue;
             }
-        });
+
+            dataService.getCommunicator().fetchRelevantStockData(
+                    symbol,
+                    (empty, body) -> {
+                        try {
+                            ExtendedCommunicator
+                                    .parseStockDataFromResponseBody(body)
+                                    .ifPresent(data -> {
+                                        System.out.println("Checking validity for: " + instrument.name());
+                                        if (isIgnorable(data)) {
+                                            toRemove.add(instrument.ticker());
+                                            return;
+                                        }
+                                        if (data.percentualChange() < depreciationLimit) {/// Checks weather the stock depreciated enough
+                                            result.put(instrument.ticker(), data);
+                                            System.out.println("Adding " + instrument.name() + " to buy list.\nIt depreciated: " + data.percentualChange() + "\nthe price is: " + data.stockPrice() + " in " + data.currency());
+                                            System.out.println(instrument);
+                                        }
+                                    });
+                        } finally {
+                            latch.countDown(); // ALWAYS
+                        }
+                    }
+            );
+        }
+        try {
+            latch.await();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
+        validInstruments.entrySet().removeIf(entry -> toRemove.contains(entry.getKey()));
 
         return result;
+    }
+
+    private boolean isIgnorable(RelevantStockData data){
+        return data.stockPrice() * dataService.getExchangeRateToEur(data.currency())
+                <
+                10.0;
     }
 
     @Override

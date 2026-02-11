@@ -1,19 +1,20 @@
 package sk.leo.api;
 
-import sk.leo.api.TwelveData.TwelveDataFetcher;
 import sk.leo.api.records.AccountSummary;
 import sk.leo.api.records.Instrument;
 import sk.leo.api.records.Position;
 import sk.leo.logic.TradeHelper;
 import sk.leo.logic.local.LocalStorer;
 
-import java.util.*;
-import java.util.concurrent.CountDownLatch;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 public class ExtendedDataService extends DataService {
-    public ExtendedDataService(String header, CountDownLatch readyLatch) {
-        super(header, readyLatch);
+    public ExtendedDataService(String header) {
+        super(header);
     }
 
     public AccountSummary getAccountSummary() {
@@ -39,19 +40,12 @@ public class ExtendedDataService extends DataService {
                 .collect(Collectors.toMap(Instrument::ticker, p -> p));
     }
 
-    public void storeInstrumentMapping() {
-        Map<String, String> tickerSymbolMap =
-                getAllValidInstruments().values().stream().collect(Collectors.toMap(
-                        Instrument::ticker,
-                        instrument -> {
-                            try {
-                                Optional<String> symbol = twelveDataFetcher.resolveSymbolByIsin(instrument.isin());
-                                return symbol.orElse("");
-                            } catch (Exception e) {
-                                throw new RuntimeException(e);
-                            }
+    public void storeInstrumentSymbolMapping() {
+        getAllValidInstruments().values().forEach(
+                instrument -> getCommunicator().resolveSymbolByIsin(instrument.isin(),
+                        (empty, body) -> {
+                            Optional<String> symbol = ExtendedCommunicator.parseSymbolFromResponseBody(body);
+                            symbol.ifPresent(s -> LocalStorer.storeTickerSymbolMapping(instrument.ticker(), s));
                         }));
-
-        LocalStorer.storeTickerSymbolMapping(tickerSymbolMap);
     }
 }

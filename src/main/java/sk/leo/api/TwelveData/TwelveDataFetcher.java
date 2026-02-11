@@ -2,7 +2,6 @@ package sk.leo.api.TwelveData;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.sun.security.jgss.GSSUtil;
 import sk.leo.api.records.RelevantStockData;
 import sk.leo.logic.TradeHelper;
 
@@ -26,6 +25,7 @@ public class TwelveDataFetcher {
         this.apiKey = apiKey;
     }
 
+    @Deprecated
     public Optional<RelevantStockData> fetchRelevantStockData(String symbol) throws IOException, InterruptedException {
 
         ObjectMapper mapper = new ObjectMapper();
@@ -77,7 +77,7 @@ public class TwelveDataFetcher {
         return Optional.of(new RelevantStockData(percentualChange, TradeHelper.round2(todayClose), currency));
     }
 
-
+    @Deprecated
     public Optional<String> resolveSymbolByIsin(String isin) throws Exception {
         if (REQUEST_THIS_DAY.get() >= DAILY_LIMIT) return Optional.empty();
 
@@ -107,13 +107,16 @@ public class TwelveDataFetcher {
         return Optional.empty();
     }
 
+    @Deprecated
     public Optional<Double> getExchangeRateToEur(String otherCurrency) throws IOException, InterruptedException {
         if (REQUEST_THIS_DAY.get() >= DAILY_LIMIT) return Optional.empty();
 
         String url =
                 "https://api.twelvedata.com/exchange_rate" +
-                        "?symbol=" + otherCurrency + "/EUR" +
-                        "&apikey=" + apiKey;
+                        "?apikey=" + apiKey +
+                        "&symbol=" + otherCurrency + "/EUR";
+
+        System.out.println(url);
 
         HttpClient client = HttpClient.newHttpClient();
         HttpRequest req = HttpRequest.newBuilder()

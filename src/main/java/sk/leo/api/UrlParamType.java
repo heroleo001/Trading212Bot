@@ -4,7 +4,7 @@ public enum UrlParamType {
     API_KEY {
         @Override
         public String getAsString(String argument) {
-            return "apikey" + argument;
+            return "apikey=" + argument;
         }
     },
     SYMBOL {
@@ -16,7 +16,7 @@ public enum UrlParamType {
     TIME_INTERVAL {
         @Override
         public String getAsString(String argument) {
-            return "interval=1" + argument;
+            return "interval=" + argument;
         }
     },
     OUTPUT_SIZE {
