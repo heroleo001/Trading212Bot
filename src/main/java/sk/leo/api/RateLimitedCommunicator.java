@@ -2,6 +2,7 @@ package sk.leo.api;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.LoggerFactory;
 import sk.leo.api.records.ResolvedEndpoint;
 
 import java.net.http.HttpClient;

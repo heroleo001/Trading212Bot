@@ -12,6 +12,7 @@ import java.time.*;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class PercentToMove implements TradingStrategy {
     private final ExtendedDataService dataService;
@@ -39,14 +40,18 @@ public class PercentToMove implements TradingStrategy {
 
     @Override
     public int runDailyAnalysis() {
-        checkAndSellPositions();    //Sell
-        checkAndBuyInstruments();   //Buy
-//        System.out.println("HELOO" + LocalStorer.loadTickerSymbolMapping().get("AIRE_US_EQ"));
+//        checkAndSellPositions();                                                        //Sell
+        /// 2min delay
+//        scheduler.schedule(this::checkAndBuyInstruments, 2, TimeUnit.MINUTES);    //Buy
+        System.out.println("dataService.getExchangeRateToEur(\"GBP\") = " + dataService.getExchangeRateToEur("GBP"));
+        System.out.println("dataService.getExchangeRateToEur(\"GBX\") = " + dataService.getExchangeRateToEur("GBX"));
         return 0;
     }
 
     private void checkAndBuyInstruments() {
-        for (var stock : getBuyQuantities().entrySet()){
+        Map<String, Integer> buyQuantities = getBuyQuantities();
+        System.out.println("\nStarting buying process!!!");
+        for (var stock : buyQuantities.entrySet()) {
             dataService.getCommunicator().buyMarket(stock.getKey(), stock.getValue());
         }
     }
@@ -63,14 +68,21 @@ public class PercentToMove implements TradingStrategy {
 
         final double finalCashPerAsset = cashPerAsset;
 
-        return instrumentsToBuy.keySet().stream().collect(
-                Collectors.toMap(
-                        ticker -> ticker,
-                        ticker -> {
-                            RelevantStockData stockData = instrumentsToBuy.get(ticker);
-                            return (int) (finalCashPerAsset / stockData.stockPrice() * dataService.getExchangeRateToEur(stockData.currency()));
-                        })
-        );
+        return instrumentsToBuy.entrySet().stream()
+                .flatMap(entry ->
+                        dataService.getExchangeRateToEur(entry.getValue().currency()).stream()
+                                .map(exchangeRate -> Map.entry(
+                                        entry.getKey(),
+                                        (int) (finalCashPerAsset
+                                                / entry.getValue().stockPrice()
+                                                * exchangeRate)
+                                ))
+                )
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        Map.Entry::getValue
+                ));
+
     }
 
     /**
@@ -129,7 +141,7 @@ public class PercentToMove implements TradingStrategy {
         return result;
     }
 
-    private boolean isIgnorable(RelevantStockData data){
+    private boolean isIgnorable(RelevantStockData data) {
         return data.stockPrice() * dataService.getExchangeRateToEur(data.currency())
                 <
                 10.0;

@@ -9,7 +9,7 @@ import java.util.Set;
 public class TradeHelper {
     private TradeHelper(){}
 
-    private static final Set<String> validForeignCurrencies = Set.of("GBX", "USD");
+    private static final Set<String> validForeignCurrencies = Set.of("GBX", "USD", "GBP");
 
     public static boolean isValidBaseStock(Instrument i) {
         if (!"STOCK".equals(i.type()))
@@ -31,12 +31,11 @@ public class TradeHelper {
                 || name.contains("test")
                 || name.contains("rights")
                 || name.contains("warrant")
-                || name.contains("unit")
-                || name.contains("preferred"))
+                || name.contains("unit"))
             return false;
 
-//        if (!i.extendedHours())
-//            return false;
+        if (!i.extendedHours())
+            return false;
 
         // Ideal 250 000 or less
         return (i.maxOpenQuantity() > 250_000);

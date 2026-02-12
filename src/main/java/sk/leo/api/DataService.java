@@ -74,9 +74,16 @@ public class DataService {
         decrementRemainingInitialCalls();
     }
 
-    public double getExchangeRateToEur(String currency){
-        if (currency.equals("EUR")) return 1;
-        return currencyExchangeRateToEur.get(currency);
+    public Optional<Double> getExchangeRateToEur(String currency){
+        currency = currency.toUpperCase();
+        if (currency.equals("EUR")) return Optional.of(1.0);
+        System.out.println("Looking up FX rate for: " + currency);
+        System.out.println("Available currencies: " + currencyExchangeRateToEur.keySet());
+
+        if (!currencyExchangeRateToEur.containsKey(currency)){
+            return Optional.empty();
+        }
+        return Optional.of(currencyExchangeRateToEur.get(currency));
     }
 
     private void rereadExchangeRates(){
