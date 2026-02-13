@@ -12,12 +12,12 @@ import java.time.*;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 public class PercentToMove implements TradingStrategy {
     private final ExtendedDataService dataService;
 
     public final double appreciationLimit;
+    public final double extremeAppreciationLimit;
     public final double depreciationLimit;
     public final double onePositionPercentageLimit;
 
@@ -25,8 +25,9 @@ public class PercentToMove implements TradingStrategy {
 
     private static final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
-    public PercentToMove(double appreciationLimit, double depreciationLimit, double onePositionPercentageLimit) {
+    public PercentToMove(double appreciationLimit, double extremeAppreciationLimit, double depreciationLimit, double onePositionPercentageLimit) {
         this.appreciationLimit = appreciationLimit;
+        this.extremeAppreciationLimit = extremeAppreciationLimit;
         this.depreciationLimit = depreciationLimit;
         this.onePositionPercentageLimit = onePositionPercentageLimit;
 
@@ -40,11 +41,9 @@ public class PercentToMove implements TradingStrategy {
 
     @Override
     public int runDailyAnalysis() {
-//        checkAndSellPositions();                                                        //Sell
+        checkAndSellPositions();                                                        //Sell
         /// 2min delay
-//        scheduler.schedule(this::checkAndBuyInstruments, 2, TimeUnit.MINUTES);    //Buy
-        System.out.println("dataService.getExchangeRateToEur(\"GBP\") = " + dataService.getExchangeRateToEur("GBP"));
-        System.out.println("dataService.getExchangeRateToEur(\"GBX\") = " + dataService.getExchangeRateToEur("GBX"));
+        scheduler.schedule(this::checkAndBuyInstruments, 10, TimeUnit.MINUTES);    //Buy
         return 0;
     }
 
@@ -110,20 +109,21 @@ public class PercentToMove implements TradingStrategy {
                     symbol,
                     (empty, body) -> {
                         try {
-                            ExtendedCommunicator
-                                    .parseStockDataFromResponseBody(body)
-                                    .ifPresent(data -> {
-                                        System.out.println("Checking validity for: " + instrument.name());
-                                        if (isIgnorable(data)) {
-                                            toRemove.add(instrument.ticker());
-                                            return;
-                                        }
-                                        if (data.percentualChange() < depreciationLimit) {/// Checks weather the stock depreciated enough
-                                            result.put(instrument.ticker(), data);
-                                            System.out.println("Adding " + instrument.name() + " to buy list.\nIt depreciated: " + data.percentualChange() + "\nthe price is: " + data.stockPrice() + " in " + data.currency());
-                                            System.out.println(instrument);
-                                        }
-                                    });
+                            Optional<RelevantStockData> stockDataOptional =
+                                    ExtendedCommunicator.parseStockDataFromResponseBody(body);
+                            if (stockDataOptional.isPresent()) {
+                                RelevantStockData data = stockDataOptional.get();
+                                if (isIgnorable(stockDataOptional.get())) {
+                                    toRemove.add(instrument.ticker());
+                                }
+                                else if (data.percentualChange() < depreciationLimit) {/// Checks weather the stock depreciated enough
+                                    result.put(instrument.ticker(), data);
+                                    System.out.println("Adding " + instrument.name() + " to buy list.\nIt depreciated: " + data.percentualChange() + "\nthe price is: " + data.stockPrice() + " in " + data.currency());
+                                    System.out.println(instrument);
+                                }
+                            } else {
+                                toRemove.add(instrument.ticker());
+                            }
                         } finally {
                             latch.countDown(); // ALWAYS
                         }
@@ -142,9 +142,10 @@ public class PercentToMove implements TradingStrategy {
     }
 
     private boolean isIgnorable(RelevantStockData data) {
-        return data.stockPrice() * dataService.getExchangeRateToEur(data.currency())
-                <
-                10.0;
+        Optional<Double> exchangeRate = dataService.getExchangeRateToEur(data.currency());
+        return exchangeRate.map(aDouble -> data.stockPrice() * aDouble
+                < 10.0
+        ).orElse(true);
     }
 
     @Override
@@ -159,6 +160,17 @@ public class PercentToMove implements TradingStrategy {
                 System.out.println("Daily analysis return: " + runDailyAnalysis());
             }
         }, initialDelay, period, TimeUnit.SECONDS);
+
+        scheduler.scheduleAtFixedRate(this::checkExtremeAppreciation,
+                0, dataService.getRefreshTimePeriodMin(), TimeUnit.MINUTES);
+    }
+
+    private void checkExtremeAppreciation(){
+        dataService.getOpenPositions().stream().filter(
+                position -> position.appreciation() >= extremeAppreciationLimit
+        ).forEach(position ->
+                scheduler.schedule(() -> dataService.getCommunicator().sellPosition(position),
+                        20, TimeUnit.MINUTES));    ///Sell position after 20min
     }
 
     private static long computeInitialDelay() {
@@ -166,9 +178,8 @@ public class PercentToMove implements TradingStrategy {
         LocalDateTime now = LocalDateTime.now(zone);
         LocalDateTime nextRun = now.withHour(15).withMinute(30).withSecond(0);
 
-        if (!now.isBefore(nextRun)) {
+        if (!now.isBefore(nextRun))
             nextRun = nextRun.plusDays(1);
-        }
 
         return Duration.between(now, nextRun).getSeconds();
     }

@@ -4,8 +4,7 @@ import sk.leo.api.records.Instrument;
 import sk.leo.logic.TradeHelper;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class DataService {
@@ -17,6 +16,10 @@ public class DataService {
     private final CountDownLatch readyLatch;
     private final AtomicInteger remaining;
     private final Set<String> validForeignCurrencies;
+
+    private final int refreshTimePeriodMin = 5;
+
+    private static final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
     public DataService(String header) {
         communicator = new ExtendedCommunicator(
@@ -34,12 +37,8 @@ public class DataService {
         this.remaining = new AtomicInteger((int) toReadCount);
 
         fetchAllAvailableInstruments();
-        new Timer().scheduleAtFixedRate(new TimerTask() {
-            @Override
-            public void run() {
-                rereadData();
-            }
-        },0, 1000 * 60 * 30);
+        scheduler.scheduleAtFixedRate(this::rereadData,
+                0, refreshTimePeriodMin, TimeUnit.MINUTES);
 
         try {
             readyLatch.await();
@@ -77,8 +76,6 @@ public class DataService {
     public Optional<Double> getExchangeRateToEur(String currency){
         currency = currency.toUpperCase();
         if (currency.equals("EUR")) return Optional.of(1.0);
-        System.out.println("Looking up FX rate for: " + currency);
-        System.out.println("Available currencies: " + currencyExchangeRateToEur.keySet());
 
         if (!currencyExchangeRateToEur.containsKey(currency)){
             return Optional.empty();
@@ -106,5 +103,9 @@ public class DataService {
 
     public ExtendedCommunicator getCommunicator() {
         return communicator;
+    }
+
+    public int getRefreshTimePeriodMin() {
+        return refreshTimePeriodMin;
     }
 }
