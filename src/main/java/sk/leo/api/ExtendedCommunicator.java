@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import sk.leo.api.records.*;
 import sk.leo.logic.TradeHelper;
+import sk.leo.logic.local.LocalStorer;
 
 import java.util.Arrays;
 import java.util.Map;
@@ -14,6 +15,10 @@ import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
+/**
+ * This class provides the methods to gain simplified access to the APIs.
+ * @Extends the RateLimitedCommunicator class
+ */
 public class ExtendedCommunicator extends RateLimitedCommunicator {
     private final Supplier<Instrument[]> instruments;
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -38,7 +43,8 @@ public class ExtendedCommunicator extends RateLimitedCommunicator {
                 null,
                 new Requests.MarketRequest(ticker, quantity, supportsExtendedHours(ticker)),
                 new TypeReference<EmptyRecord>() {},
-                (ignore, ignore1) -> {}
+                (ignore, ignore1) -> {},
+                () -> {}
         );
         callService(call);
     }
@@ -56,7 +62,7 @@ public class ExtendedCommunicator extends RateLimitedCommunicator {
     }
 
     private Optional<Map<String, Instrument>> getInstrumentsAsMap() {
-        if (instruments.get() == null)
+        if (instruments == null || instruments.get() == null)
             return Optional.empty();
         return Optional.of(Arrays.stream(instruments.get())
                 .collect(Collectors.toMap(
@@ -78,12 +84,19 @@ public class ExtendedCommunicator extends RateLimitedCommunicator {
                 Map.of(UrlParamType.ISIN, isin, UrlParamType.API_KEY, Auth.getTdApiKey()),
                 null,
                 new TypeReference<EmptyRecord>() {},
-                onResult
+                onResult,
+                () -> {}
         );
         callService(serviceCall);
     }
 
-    public void fetchRelevantStockData(String symbol, BiConsumer<EmptyRecord, String> onResult) {
+    public void fetchRelevantStockDataByTicker(String ticker, BiConsumer<EmptyRecord, String> onResult, Runnable onError) {
+        String symbol = LocalStorer.getSymbol(ticker);
+        if (symbol == null) {
+            onError.run();
+            return;
+        }
+
         ServiceCall<EmptyRecord, EmptyRecord> serviceCall = new ServiceCall<>(
                 ServiceCallType.TIME_SERIES,
                 Map.of(
@@ -93,7 +106,8 @@ public class ExtendedCommunicator extends RateLimitedCommunicator {
                         UrlParamType.TIME_INTERVAL, "1day"),
                 null,
                 new TypeReference<EmptyRecord>() {},
-                onResult
+                onResult,
+                onError
         );
         callService(serviceCall);
     }
@@ -104,7 +118,8 @@ public class ExtendedCommunicator extends RateLimitedCommunicator {
                 Map.of(UrlParamType.SYMBOL, currency + "/EUR", UrlParamType.API_KEY, Auth.getTdApiKey()),
                 null,
                 new TypeReference<CurrencyExchangeRate>() {},
-                onResult
+                onResult,
+                () -> {}
         );
         callService(serviceCall);
     }
