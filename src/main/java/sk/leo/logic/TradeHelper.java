@@ -38,7 +38,7 @@ public class TradeHelper {
             return false;
 
         // Ideal 250 000 or less
-        return (i.maxOpenQuantity() > 250_000);
+        return (i.maxOpenQuantity() > 250_0000);
     }
 
     public static double round2(double v) {

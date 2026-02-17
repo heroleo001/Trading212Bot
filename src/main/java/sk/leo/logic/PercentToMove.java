@@ -6,7 +6,6 @@ import sk.leo.api.ExtendedDataService;
 import sk.leo.api.records.Instrument;
 import sk.leo.api.records.Position;
 import sk.leo.api.records.RelevantStockData;
-import sk.leo.logic.local.LocalStorer;
 
 import java.time.*;
 import java.util.*;
@@ -35,15 +34,16 @@ public class PercentToMove implements TradingStrategy {
 
         System.out.println("All data loaded!");
 
-        dataService.storeInstrumentSymbolMapping();
+        dataService.storeTickerSymbolMapping();
         validInstruments = dataService.getAllValidInstruments();
     }
 
     @Override
     public int runDailyAnalysis() {
-        checkAndSellPositions();                                                        //Sell
+        //checkAndSellPositions();                                                        //Sell
         /// 2min delay
-        scheduler.schedule(this::checkAndBuyInstruments, 10, TimeUnit.MINUTES);    //Buy
+//        scheduler.schedule(this::checkAndBuyInstruments, 10, TimeUnit.MINUTES);    //Buy
+        checkAndBuyInstruments();
         return 0;
     }
 
@@ -57,31 +57,44 @@ public class PercentToMove implements TradingStrategy {
 
     private Map<String, Integer> getBuyQuantities() {
         Map<String, RelevantStockData> instrumentsToBuy = getInstrumentsToBuy();
-
-        double cashAvailable = dataService.getAccountSummary().cash().availableToTrade();
-        double cashPerAsset = TradeHelper.round2(cashAvailable / instrumentsToBuy.size());
-
-        if (cashPerAsset / cashAvailable > onePositionPercentageLimit) {
-            cashPerAsset = onePositionPercentageLimit * cashAvailable;
+        if (instrumentsToBuy.isEmpty()) {
+            System.out.println("Nothing to buy");
+            return Map.of();
         }
 
-        final double finalCashPerAsset = cashPerAsset;
+        double cashAvailable = dataService.getAccountSummary().cash().availableToTrade();
+        final double notLimitedCashPerAsset = TradeHelper.round2(cashAvailable / instrumentsToBuy.size());
 
         return instrumentsToBuy.entrySet().stream()
                 .flatMap(entry ->
                         dataService.getExchangeRateToEur(entry.getValue().currency()).stream()
-                                .map(exchangeRate -> Map.entry(
-                                        entry.getKey(),
-                                        (int) (finalCashPerAsset
-                                                / entry.getValue().stockPrice()
-                                                * exchangeRate)
-                                ))
+                                .map(exchangeRate -> {
+                                    double valueToBuy = notLimitedCashPerAsset;
+                                    final double maxBuyableValue = maxBuyableValueToKeepLimit(entry.getKey());
+                                    if (valueToBuy > maxBuyableValue)
+                                        valueToBuy = maxBuyableValue;
+                                    System.out.print("Trying to map the buy order to");
+
+
+                                    return Map.entry(
+                                            entry.getKey(),
+                                            (int) (valueToBuy
+                                                    / entry.getValue().stockPrice()
+                                                    * exchangeRate));
+                                })
                 )
                 .collect(Collectors.toMap(
                         Map.Entry::getKey,
                         Map.Entry::getValue
                 ));
+    }
 
+    private double maxBuyableValueToKeepLimit(String ticker) {
+        final double currentValue = dataService.getPosition(ticker)
+                .map(Position::currentValue)
+                .orElse(0.0);
+        final double totalAccountValue = dataService.getAccountSummary().totalValue();
+        return totalAccountValue * onePositionPercentageLimit - currentValue;
     }
 
     /**
@@ -91,56 +104,68 @@ public class PercentToMove implements TradingStrategy {
     private Map<String, RelevantStockData> getInstrumentsToBuy() {
         System.out.println("There are " + validInstruments.size() + " tradable stocks:");
 
-        Map<String, String> tickerSymbolMap = LocalStorer.loadTickerSymbolMapping();
+        for (var ins : validInstruments.keySet())
+            System.out.println(ins);
 
         Map<String, RelevantStockData> result = new HashMap<>();
         CountDownLatch latch = new CountDownLatch(validInstruments.size());
         Set<String> toRemove = ConcurrentHashMap.newKeySet();
 
         for (var instrument : validInstruments.values()) {
-            String symbol = tickerSymbolMap.get(instrument.ticker());
-            if (symbol == null) {
-                toRemove.add(instrument.ticker());
-                latch.countDown();
-                continue;
-            }
-
-            dataService.getCommunicator().fetchRelevantStockData(
-                    symbol,
+            dataService.getCommunicator().fetchRelevantStockDataByTicker(
+                    instrument.ticker(),
                     (empty, body) -> {
                         try {
+                            System.out.println("Executing response for " + body);
                             Optional<RelevantStockData> stockDataOptional =
                                     ExtendedCommunicator.parseStockDataFromResponseBody(body);
                             if (stockDataOptional.isPresent()) {
                                 RelevantStockData data = stockDataOptional.get();
-                                if (isIgnorable(stockDataOptional.get())) {
+                                if (isIgnorable(stockDataOptional.get())) { /// Remove from list if the price is too low (Penny-stock)
                                     toRemove.add(instrument.ticker());
-                                }
-                                else if (data.percentualChange() < depreciationLimit) {/// Checks weather the stock depreciated enough
+
+                                    /// Main Part
+                                } else if (data.percentualChange() < depreciationLimit) {/// Checks weather the stock depreciated enough
                                     result.put(instrument.ticker(), data);
                                     System.out.println("Adding " + instrument.name() + " to buy list.\nIt depreciated: " + data.percentualChange() + "\nthe price is: " + data.stockPrice() + " in " + data.currency());
                                     System.out.println(instrument);
                                 }
-                            } else {
+                            } else { /// Remove instrument from list if the TIME_SERIES req. returned error, probably because it is not accessible with your pay-grade
                                 toRemove.add(instrument.ticker());
                             }
                         } finally {
-                            latch.countDown(); // ALWAYS
+                            countDownAndPrintProgress(latch);
                         }
-                    }
+                    },
+                    /// OnError runnable. Ensures the process gets finished when the response returns an ERROR
+                    () -> countDownAndPrintProgress(latch)
             );
+
         }
         try {
             latch.await();
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
+        } finally {
+            System.out.println("\n\n____________________Finished Searching for stocks to buy___________________________");
         }
 
         validInstruments.entrySet().removeIf(entry -> toRemove.contains(entry.getKey()));
-
         return result;
     }
 
+    private void countDownAndPrintProgress(CountDownLatch latch) {
+        latch.countDown();
+        System.out.println("Remaining " + latch.getCount() + "/" + validInstruments.size());
+        System.out.println("Estimated time > " + latch.getCount() / 8 + " minutes");
+    }
+
+    /**
+     *
+     * @param data
+     * @return weather the stock is cheaper than 10€.   Probably a penny-stock
+     *
+     */
     private boolean isIgnorable(RelevantStockData data) {
         Optional<Double> exchangeRate = dataService.getExchangeRateToEur(data.currency());
         return exchangeRate.map(aDouble -> data.stockPrice() * aDouble
@@ -165,7 +190,7 @@ public class PercentToMove implements TradingStrategy {
                 0, dataService.getRefreshTimePeriodMin(), TimeUnit.MINUTES);
     }
 
-    private void checkExtremeAppreciation(){
+    private void checkExtremeAppreciation() {
         dataService.getOpenPositions().stream().filter(
                 position -> position.appreciation() >= extremeAppreciationLimit
         ).forEach(position ->

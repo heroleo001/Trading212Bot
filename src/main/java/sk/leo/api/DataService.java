@@ -7,6 +7,9 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
+/**
+ * This class periodically refreshes and provides access to the data requested from the API
+ */
 public class DataService {
     private final ExtendedCommunicator communicator;
 

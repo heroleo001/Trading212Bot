@@ -56,19 +56,18 @@ public class RateLimitedCommunicator {
     private boolean canCallNow(ServiceCall<?, ?> call) {
         /// Temp solution to limit TD calls
         if (call.callType().getProvider() == ServiceCallType.Provider.TWELVE_DATA &&
-                numberOfTDRequests.get() >= 800){
+                numberOfTDRequests.get() >= 800)
             return false;
-        }
+
 
         ServiceCallType callType = call.callType();
         Set<ServiceCallType> callTypes = getSetOfAllSharedLimitCalls(callType);
 
         Instant cutoffTime = Instant.now().minus(callType.getTimePeriod()); // Instant after which the calls are within the time period for the Call
 
-        int callCounter = 0;
-        for (var t : callTypes){
-            callCounter += getCallAmountAfterCutoffTime(t, cutoffTime);
-        }
+        int callCounter = callTypes.stream()
+                .mapToInt(t -> getCallAmountAfterCutoffTime(t, cutoffTime))
+                .sum();
 
         return callCounter < callType.getOperationLimit();
     }
@@ -120,6 +119,7 @@ public class RateLimitedCommunicator {
 
         if (httpResponse.statusCode() != 200) {
             System.out.println("Error\nCall Failed");
+            call.onError().run();
         } else {
             RS responseObj = MAPPER.readValue(httpResponse.body(), call.responseType());
             call.onResult().accept(responseObj, httpResponse.body());

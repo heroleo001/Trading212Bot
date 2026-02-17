@@ -22,7 +22,7 @@ public enum ServiceCallType {
         public ServiceCall<?, ?> createRefreshCall(DataService service) {
             return new ServiceCall<>(this, null, null,
                     new TypeReference<AccountSummary>() {
-                    }, (rs, body) -> service.put(this, rs));
+                    }, (rs, body) -> service.put(this, rs), () -> {});
         }
 
         @Override
@@ -41,7 +41,7 @@ public enum ServiceCallType {
         public ServiceCall<?, ?> createRefreshCall(DataService service) {
             return new ServiceCall<>(this, null, null,
                     new TypeReference<Position[]>() {
-                    }, (rs, body) -> service.put(this, rs));
+                    }, (rs, body) -> service.put(this, rs), () -> {});
         }
 
         @Override
@@ -59,7 +59,7 @@ public enum ServiceCallType {
         public ServiceCall<?, ?> createRefreshCall(DataService service) {
             return new ServiceCall<>(this, null, null,
                     new TypeReference<Instrument[]>() {
-                    }, (rs, body) -> service.put(this, rs));
+                    }, (rs, body) -> service.put(this, rs), () -> {});
         }
 
         @Override

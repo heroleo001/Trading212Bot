@@ -12,5 +12,6 @@ public record ServiceCall<RQ, RS> (
     Map<UrlParamType, String> pathParams,
     RQ payload,
     TypeReference<RS> responseType,
-    BiConsumer<RS, String> onResult
+    BiConsumer<RS, String> onResult,
+    Runnable onError
 ) {}
