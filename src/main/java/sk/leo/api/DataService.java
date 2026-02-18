@@ -16,6 +16,7 @@ public class DataService {
 
     private final Map<ServiceCallType, Object> data = new ConcurrentHashMap<>() {};
     private final Map<String, Double> currencyExchangeRateToEur = new ConcurrentHashMap<>();
+
     private final Map<ServiceCallType, Boolean> refreshNeeded;
 
     private final CountDownLatch readyLatch;
@@ -47,11 +48,11 @@ public class DataService {
         fetchAllAvailableInstruments();
         /// All refresh call are needed (TRUE)
         refreshNeeded = Arrays.stream(ServiceCallType.values())
-                .filter(ServiceCallType::isToRefresh)
+                .filter(type ->
+                        type.isToRefresh() || type == ServiceCallType.EXCHANGE_RATE)
                 .collect(Collectors.toMap(
                         type -> type,
                         ig -> true
-
                 ));
 
         /// Refresh data scheduler
@@ -71,6 +72,7 @@ public class DataService {
     }
 
     private void rereadData() {
+        System.out.println(refreshNeeded);
         rereadRefreshData();
         rereadExchangeRates();
     }
