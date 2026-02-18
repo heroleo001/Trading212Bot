@@ -1,6 +1,6 @@
 package sk.leo.logic;
 
 public interface TradingStrategy {
-    int runDailyAnalysis();
+    void runDailyAnalysis();
     void start();
 }
