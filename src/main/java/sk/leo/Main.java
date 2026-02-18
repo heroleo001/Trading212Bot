@@ -11,6 +11,6 @@ public class Main {
                 0.10,
                 -0.04,
                 0.06);
-        strategy.runDailyAnalysis();
+        strategy.start();
     }
 }
