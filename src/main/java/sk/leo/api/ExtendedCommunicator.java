@@ -30,9 +30,6 @@ public class ExtendedCommunicator extends RateLimitedCommunicator {
 
     public void buyMarket(String ticker,
                           double quantity) {
-
-        System.out.println("buy MARKET: " + ticker + "\t" + quantity);
-
         if (quantity == 0) {
             System.out.println("Selling zero");
             return;

@@ -6,6 +6,7 @@ import sk.leo.logic.TradeHelper;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 /**
  * This class periodically refreshes and provides access to the data requested from the API
@@ -15,6 +16,7 @@ public class DataService {
 
     private final Map<ServiceCallType, Object> data = new ConcurrentHashMap<>() {};
     private final Map<String, Double> currencyExchangeRateToEur = new ConcurrentHashMap<>();
+    private final Map<ServiceCallType, Boolean> refreshNeeded;
 
     private final CountDownLatch readyLatch;
     private final AtomicInteger remaining;
@@ -25,13 +27,16 @@ public class DataService {
     private static final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
     public DataService(String header) {
+        /// Init communicator
         communicator = new ExtendedCommunicator(
                 header,
                 () -> get(ServiceCallType.GET_ALL_AVAILABLE_INSTRUMENTS, Instrument[].class));
-        this.readyLatch = new CountDownLatch(1);
 
+        /// Fetch valid foreign currencies
         validForeignCurrencies = TradeHelper.getValidForeignCurrencies();
 
+        /// Init the CountDownLatch
+        this.readyLatch = new CountDownLatch(1);
         long toReadCount = Arrays.stream(ServiceCallType.values())
                 .filter(ServiceCallType::isToRefresh)
                 .count()
@@ -40,6 +45,16 @@ public class DataService {
         this.remaining = new AtomicInteger((int) toReadCount);
 
         fetchAllAvailableInstruments();
+        /// All refresh call are needed (TRUE)
+        refreshNeeded = Arrays.stream(ServiceCallType.values())
+                .filter(ServiceCallType::isToRefresh)
+                .collect(Collectors.toMap(
+                        type -> type,
+                        ig -> true
+
+                ));
+
+        /// Refresh data scheduler
         scheduler.scheduleAtFixedRate(this::rereadData,
                 0, refreshTimePeriodMin, TimeUnit.MINUTES);
 
@@ -80,15 +95,18 @@ public class DataService {
         currency = currency.toUpperCase();
         if (currency.equals("EUR")) return Optional.of(1.0);
 
-        if (!currencyExchangeRateToEur.containsKey(currency)){
+        if (!refreshNeeded.get(ServiceCallType.EXCHANGE_RATE) ||
+            !currencyExchangeRateToEur.containsKey(currency)) {
             return Optional.empty();
         }
+
         return Optional.of(currencyExchangeRateToEur.get(currency));
     }
 
     private void rereadExchangeRates(){
-        validForeignCurrencies.forEach(currency -> communicator.getExchangeRateToEur(currency,
-                ((exchangeRate, body) -> putCurrency(currency, exchangeRate.rate()))));
+        if (refreshNeeded.get(ServiceCallType.EXCHANGE_RATE))
+            validForeignCurrencies.forEach(currency -> communicator.getExchangeRateToEur(currency,
+                    ((exchangeRate, body) -> putCurrency(currency, exchangeRate.rate()))));
     }
 
     private void fetchAllAvailableInstruments(){
@@ -97,11 +115,20 @@ public class DataService {
     }
 
     private void rereadRefreshData(){
-        Arrays.stream(ServiceCallType.values()).
-                filter(ServiceCallType::isToRefresh).forEach(type -> {
+        Arrays.stream(ServiceCallType.values())
+                .filter(ServiceCallType::isToRefresh)
+                .filter(refreshNeeded::get)
+                .forEach(type -> {
                     ServiceCall<?, ?> call = type.createRefreshCall(this);
                     communicator.callService(call);
                 });
+    }
+
+    public void setRefreshNeeded(ServiceCallType callType, boolean aFlag){
+        refreshNeeded.put(callType, aFlag);
+        if (aFlag){
+            rereadData();
+        }
     }
 
     public ExtendedCommunicator getCommunicator() {

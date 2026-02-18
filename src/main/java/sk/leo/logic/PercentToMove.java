@@ -3,6 +3,7 @@ package sk.leo.logic;
 import sk.leo.api.Auth;
 import sk.leo.api.ExtendedCommunicator;
 import sk.leo.api.ExtendedDataService;
+import sk.leo.api.ServiceCallType;
 import sk.leo.api.records.Instrument;
 import sk.leo.api.records.Position;
 import sk.leo.api.records.RelevantStockData;
@@ -36,23 +37,27 @@ public class PercentToMove implements TradingStrategy {
 
         dataService.storeTickerSymbolMapping();
         validInstruments = dataService.getAllValidInstruments();
+        dataService.setRefreshNeeded(ServiceCallType.EXCHANGE_RATE, false);
     }
 
     @Override
-    public int runDailyAnalysis() {
-        //checkAndSellPositions();                                                        //Sell
+    public void runDailyAnalysis() {
+        checkAndSellPositions();                                                        //Sell
         /// 2min delay
-//        scheduler.schedule(this::checkAndBuyInstruments, 10, TimeUnit.MINUTES);    //Buy
-        checkAndBuyInstruments();
-        return 0;
+        scheduler.schedule(this::checkAndBuyInstruments, 20, TimeUnit.MINUTES);    //Buy
     }
 
     private void checkAndBuyInstruments() {
+        dataService.setRefreshNeeded(ServiceCallType.EXCHANGE_RATE, true);
+
         Map<String, Integer> buyQuantities = getBuyQuantities();
-        System.out.println("\nStarting buying process!!!");
+        System.out.println("\nStarting buying process!!! Buying " + buyQuantities.size() + " stocks");
         for (var stock : buyQuantities.entrySet()) {
             dataService.getCommunicator().buyMarket(stock.getKey(), stock.getValue());
         }
+
+        System.out.println("Finished Process!!!!!!!!!");
+        dataService.setRefreshNeeded(ServiceCallType.EXCHANGE_RATE, false);
     }
 
     private Map<String, Integer> getBuyQuantities() {
@@ -112,11 +117,11 @@ public class PercentToMove implements TradingStrategy {
         Set<String> toRemove = ConcurrentHashMap.newKeySet();
 
         for (var instrument : validInstruments.values()) {
+            System.out.println("Name: " + instrument.name());
             dataService.getCommunicator().fetchRelevantStockDataByTicker(
                     instrument.ticker(),
                     (empty, body) -> {
                         try {
-                            System.out.println("Executing response for " + body);
                             Optional<RelevantStockData> stockDataOptional =
                                     ExtendedCommunicator.parseStockDataFromResponseBody(body);
                             if (stockDataOptional.isPresent()) {
@@ -162,7 +167,6 @@ public class PercentToMove implements TradingStrategy {
 
     /**
      *
-     * @param data
      * @return weather the stock is cheaper than 10€.   Probably a penny-stock
      *
      */
@@ -182,7 +186,8 @@ public class PercentToMove implements TradingStrategy {
             DayOfWeek today = LocalDate.now(ZoneId.systemDefault()).getDayOfWeek();
 
             if (today != DayOfWeek.SATURDAY && today != DayOfWeek.SUNDAY) {
-                System.out.println("Daily analysis return: " + runDailyAnalysis());
+                System.out.println("Running analysis");
+                runDailyAnalysis();
             }
         }, initialDelay, period, TimeUnit.SECONDS);
 
@@ -201,7 +206,7 @@ public class PercentToMove implements TradingStrategy {
     private static long computeInitialDelay() {
         ZoneId zone = ZoneId.systemDefault();
         LocalDateTime now = LocalDateTime.now(zone);
-        LocalDateTime nextRun = now.withHour(15).withMinute(30).withSecond(0);
+        LocalDateTime nextRun = now.withHour(14).withMinute(0).withSecond(0);
 
         if (!now.isBefore(nextRun))
             nextRun = nextRun.plusDays(1);

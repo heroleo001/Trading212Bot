@@ -2,7 +2,7 @@ package sk.leo.api;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.slf4j.LoggerFactory;
+import org.jetbrains.annotations.NotNull;
 import sk.leo.api.records.ResolvedEndpoint;
 
 import java.net.http.HttpClient;
@@ -17,7 +17,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class RateLimitedCommunicator {
     private final Map<ServiceCallType, Queue<ServiceCall<?, ?>>> queues = new ConcurrentHashMap<>();
-    private final Map<ServiceCallType, Deque<Instant>> calls = new ConcurrentHashMap<>();
+    private static final Map<ServiceCallType, Deque<Instant>> calls = new ConcurrentHashMap<>();
 
     private static final ObjectMapper MAPPER = new ObjectMapper().configure(
             DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES,
@@ -25,7 +25,7 @@ public class RateLimitedCommunicator {
     );
     private static final HttpClient CLIENT = HttpClient.newHttpClient();
 
-    private final AtomicInteger numberOfTDRequests = new AtomicInteger(0);
+    private static final AtomicInteger numberOfTDRequests = new AtomicInteger(0);
 
     private final String header;
 
